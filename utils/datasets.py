@@ -2,12 +2,15 @@ import csv
 import sys
 
 import numpy as np
+from transformers import GPT2TokenizerFast
 
 
 class LabelledDataset:
     def __init__(self, inputs, labels):
-        self._inputs = inputs  # List(List(Str)): [['t0', 't1', ...], ['t0', 't1', ...]] or List(Str): ['t0 t1 ... tN']
-        self._labels = labels  # List(List(Str)): [['l0', 'l1', ...], ['l0', 'l1', ...]] or List(Str): ['l0', 'l1', ...]
+        # List(List(Str)): [['t0', 't1', ...], ['t0', 't1', ...]] or List(Str): ['t0 t1 ... tN']
+        self._inputs = inputs
+        # List(List(Str)): [['l0', 'l1', ...], ['l0', 'l1', ...]] or List(Str): ['l0', 'l1', ...]
+        self._labels = labels
         self._label_level = None
 
     def __len__(self):
@@ -83,7 +86,8 @@ class LabelledDataset:
         # generate batches while indices remain
         while len(remaining_idcs) > 0:
             # pop-off relevant number of instances from pre-shuffled set of remaining indices
-            batch_idcs = [remaining_idcs.pop() for _ in range(min(batch_size, len(remaining_idcs)))]
+            batch_idcs = [remaining_idcs.pop()
+                          for _ in range(min(batch_size, len(remaining_idcs)))]
 
             # gather batch data
             inputs = [self._inputs[idx] for idx in batch_idcs]
@@ -96,18 +100,20 @@ class LabelledDataset:
             # yield batch + number of remaining instances
             yield inputs, labels, len(remaining_idcs)
 
-    def repeat_batch_labels(self, inputs, labels, encoder):
+    def repeat_batch_labels_old(self, inputs, labels, encoder):
         rep_labels = []
 
         if self.get_label_level() == 'token':
-            tok_inputs = encoder.tokenize([s.split(' ') for s in inputs], tokenized=True)
+            tok_inputs = encoder.tokenize(
+                [s.split(' ') for s in inputs], tokenized=True)
         else:
             tok_inputs = encoder.tokenize(inputs)
 
         lbl_cursor = -1
         for sidx in range(len(inputs)):
             # convert token IDs to pieces
-            pieces = encoder._tok.convert_ids_to_tokens(tok_inputs['input_ids'][sidx])
+            pieces = encoder._tok.convert_ids_to_tokens(
+                tok_inputs['input_ids'][sidx])
             for tidx in range(tok_inputs['attention_mask'][sidx].sum()):
                 # skip special tokens
                 if (not encoder._specials) and (tok_inputs['special_tokens_mask'][sidx, tidx]):
@@ -128,11 +134,45 @@ class LabelledDataset:
 
         return rep_labels
 
+    def repeat_batch_labels(self, inputs, labels, encoder):
+        rep_labels = []
+
+        if self.get_label_level() == 'token':
+            tok_inputs = encoder.tokenize(
+                [s.split(' ') for s in inputs], tokenized=True)
+        else:
+            tok_inputs = encoder.tokenize(inputs)
+
+        lbl_cursor = -1
+        for sidx in range(len(inputs)):
+            if self.get_label_level() == 'token':
+                word_ids = tok_inputs.word_ids(batch_index=sidx)
+                previous_word_idx = None
+                for word_idx in word_ids:
+                    if word_idx is None:
+                        continue
+                    if word_idx != previous_word_idx:
+                        lbl_cursor += 1
+                        previous_word_idx = word_idx
+                    rep_labels.append(labels[lbl_cursor])
+            elif self.get_label_level() == 'sentence':
+                for tidx in range(tok_inputs['attention_mask'][sidx].sum()):
+                    if (not encoder._specials) and (tok_inputs['special_tokens_mask'][sidx, tidx]):
+                        continue
+                    rep_labels.append(labels[sidx])
+            else:
+                raise ValueError('NOT IMPLEMENTED!')
+            assert len(rep_labels) == tok_inputs['attention_mask'][:sidx+1].sum(
+            ), 'Mismatch in number of labels and tokens!'
+
+        return rep_labels
+
     def save(self, path):
         with open(path, 'w', encoding='utf8', newline='') as output_file:
             csv_writer = csv.writer(output_file, quoting=csv.QUOTE_ALL)
             # construct header for single-/multi-sequence inputs + labels
-            header = [f'text{i}' for i in range(len(self._inputs[0]))] if type(self._inputs[0]) is tuple else ['text']
+            header = [f'text{i}' for i in range(len(self._inputs[0]))] if type(
+                self._inputs[0]) is tuple else ['text']
             header.append('label')
             csv_writer.writerow(header)
             # iterate over instances
@@ -170,7 +210,8 @@ class LabelledDataset:
                     label = row['label']
                 # check if text consists of multiple sequences
                 if len(csv_reader.fieldnames) > 2:
-                    text = tuple([row[f'text{i}'] for i in range(len(csv_reader.fieldnames) - 1)])
+                    text = tuple([row[f'text{i}'] for i in range(
+                        len(csv_reader.fieldnames) - 1)])
                 # otherwise, simply retrieve the text field
                 else:
                     text = row['text']
