@@ -74,7 +74,7 @@ class PrismEncoder(nn.Module):
 
     @staticmethod
     def load(path, frq_filter=None, frq_tuning=False, emb_tuning=False, emb_pooling=None, specials=False, cache=None):
-        objects = torch.load(path)
+        objects = torch.load(path, weights_only=False)
         # load necessary components
         lm_name = objects['language_model_name']
         emb_pooling = objects.get('embedding_pooling', emb_pooling)
@@ -99,7 +99,8 @@ class PrismEncoder(nn.Module):
         return self
 
     def forward(self, sentences):
-        # embed sentences (standard last-layer encoding)
+        # embed sentences (standard last-layer encoding), removing places
+        # corresponding to special tokens
         if self._emb_tuning:
             emb_tokens, att_tokens = self.embed(sentences)
         else:
@@ -114,6 +115,7 @@ class PrismEncoder(nn.Module):
             else:
                 with torch.no_grad():
                     emb_tokens = self.filter(emb_tokens, att_tokens)
+
         # pool token embeddings
         if self._emb_pooling is not None:
             # prepare sentence embedding tensor (batch_size, 1, emb_dim)
@@ -314,7 +316,6 @@ class PrismEncoder(nn.Module):
             [embeddings[:, ::2], embeddings[:, 1::2].flip([1])], dim=1)
 
         Vc = torch.view_as_real(torch.fft.fft(v, dim=1))
-
         k = - torch.arange(N, dtype=embeddings.dtype,
                            device=embeddings.device)[None, :] * np.pi / (2 * N)
         W_r = torch.cos(k)
@@ -431,13 +432,19 @@ def get_mean_embedding(token_embeddings):
     return torch.mean(token_embeddings, dim=0)
 
 
+def get_last_embedding(token_embeddings):
+    return token_embeddings[-1, :]
+
 #
 # Helper Functions
 #
 
+
 def load_pooling_function(identifier):
     if identifier == 'mean':
         return get_mean_embedding
+    if identifier == 'last':
+        return get_last_embedding
     else:
         raise ValueError(
             f"[Error] Unknown pooling specification '{identifier}'.")

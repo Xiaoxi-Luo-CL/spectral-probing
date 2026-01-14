@@ -29,8 +29,7 @@ def classify_dataset(
         if repeat_labels:
             labels = dataset.repeat_batch_labels(
                 sentences, labels, classifier._emb)
-        from IPython import embed
-        embed()
+
         # when training, perform both forward and backward pass
         if mode == 'train':
             # zero out previous gradients

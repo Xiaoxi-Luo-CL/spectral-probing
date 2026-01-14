@@ -41,7 +41,7 @@ class EmbeddingClassifier(nn.Module):
 
     @staticmethod
     def load(path, emb_model, emb_pooling=None):
-        objects = torch.load(path)
+        objects = torch.load(path, weights_only=False)
         classes = objects['classes']
         lbl_model = objects['classifier']
         # instantiate class using pre-trained label model and fixed encoder
@@ -51,9 +51,8 @@ class EmbeddingClassifier(nn.Module):
 
     def forward(self, sentences):
         # embed sentences (batch_size, seq_length) -> (batch_size, max_length, emb_dim)
+        # if pooling, then emb_sentences: (batch_size, 1, emb_dim)
         emb_sentences, att_sentences = self._emb(sentences)
-        # from IPython import embed
-        # embed()
         # logits for all tokens in all sentences + padding -inf (batch_size, max_len, num_labels)
         logits = torch.ones(
             (att_sentences.shape[0],

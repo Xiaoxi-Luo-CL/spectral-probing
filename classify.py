@@ -39,7 +39,7 @@ def parse_arguments():
         '-et', '--embedding_tuning', action='store_true', default=False,
         help='set flag to tune the full model including embeddings (default: False)')
     arg_parser.add_argument(
-        '-ep', '--embedding_pooling', choices=['mean'], help='embedding pooling strategy (default: None)')
+        '-ep', '--embedding_pooling', choices=['mean', 'last'], help='embedding pooling strategy (default: None)')
     arg_parser.add_argument(
         '-layer', '--embed_layer', type=int, default=None, help='layer for extracting embeddings (default: last layer)')
 
@@ -72,6 +72,7 @@ def parse_arguments():
 
 def main():
     args = parse_arguments()
+    # logging.info('args:'+str(args))
 
     # set up experiment directory and logging
     setup_experiment(args.exp_path, prediction=args.prediction)
@@ -119,12 +120,12 @@ def main():
         cache=({} if args.embedding_caching else None), embed_layer=args.embed_layer)
     logging.info(f"Constructed {encoder}.")
     if args.prediction:
-        with torch.serialization.safe_globals([nn.modules.linear.Linear]):
-            encoder = PrismEncoder.load(
-                model_path, frq_filter=frq_filter, frq_tuning=frq_tuning,
-                emb_tuning=args.embedding_tuning, emb_pooling=pooling_strategy,
-                cache=({} if args.embedding_caching else None)
-            )
+        # with torch.serialization.safe_globals([nn.modules.linear.Linear]):
+        encoder = PrismEncoder.load(
+            model_path, frq_filter=frq_filter, frq_tuning=frq_tuning,
+            emb_tuning=args.embedding_tuning, emb_pooling=pooling_strategy,
+            cache=({} if args.embedding_caching else None)
+        )
         logging.info(f"Loaded pre-trained encoder from '{model_path}'.")
 
     # load classifier and loss constructors based on identifier
@@ -231,4 +232,8 @@ def main():
 if __name__ == '__main__':
     main()
 
-    # '''python classify.py tasks/wikiann/en-train.csv tasks/wikiann/en-dev.csv --repeat_labels bert-base-cased --embedding_caching "auto(512)" linear first-exp/  --random_seed 42 - -prediction'''
+    # python classify.py tasks/wikiann/en-train.csv tasks/wikiann/en-dev.csv --repeat_labels bert-base-cased --embedding_caching "auto(512)" linear first-exp/  --random_seed 42 --prediction
+
+    # python classify.py tasks/mkqa/en-train.csv tasks/mkqa/en-dev.csv --repeat_labels gpt2 --embedding_caching "auto(512)" linear first-exp/  --random_seed 42 --embed_layer last
+
+    # python classify.py tasks/ud-syntax/en-ewt-gum-train-pos.csv tasks/ud-syntax/en-ewt-gum-dev-pos.csv --repeat_labels bert-base-cased --embedding_caching "auto(512)" linear results/bert-ud-pos/ --random_seed 42

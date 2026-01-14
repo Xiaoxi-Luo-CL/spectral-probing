@@ -155,15 +155,14 @@ class LabelledDataset:
                         lbl_cursor += 1
                         previous_word_idx = word_idx
                     rep_labels.append(labels[lbl_cursor])
-            elif self.get_label_level() == 'sentence':
+            else:
                 for tidx in range(tok_inputs['attention_mask'][sidx].sum()):
                     if (not encoder._specials) and (tok_inputs['special_tokens_mask'][sidx, tidx]):
                         continue
                     rep_labels.append(labels[sidx])
-            else:
-                raise ValueError('NOT IMPLEMENTED!')
-            assert len(rep_labels) == tok_inputs['attention_mask'][:sidx+1].sum(
-            ), 'Mismatch in number of labels and tokens!'
+
+            assert len(rep_labels) == (~tok_inputs['special_tokens_mask'].bool(
+            ))[:sidx+1].sum(), 'Mismatch in number of labels and tokens!'
 
         return rep_labels
 

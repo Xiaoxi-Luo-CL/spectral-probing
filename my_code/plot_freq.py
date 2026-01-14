@@ -18,7 +18,8 @@ def parse_arguments():
     arg_parser.add_argument(
         '--embedding_tuning', action='store_true', default=False, help='set flag to tune the full model including embeddings (default: False)')
     arg_parser.add_argument(
-        '--embedding_pooling', choices=['mean'], help='embedding pooling strategy (default: None)')
+        '--embedding_pooling', choices=['mean', 'last', None],
+        default=None, help='embedding pooling strategy (default: None)')
     arg_parser.add_argument(
         '--fig_name', required=True, type=str, help='path ot save the figure')
     arg_parser.add_argument('--classifier', default='linear')
@@ -69,3 +70,6 @@ def main():
 
 if __name__ == '__main__':
     main()
+# python -m my_code.plot_freq --model_path results/gpt2-ud-pos/best.pt --valid_path tasks/mkqa/en-dev.csv --filter "auto(512)" --embedding_pooling last --fig_name results/gpt2-ud-pos/frequency_filter_weights.png
+
+# python -m my_code.plot_freq --model_path results/gpt2-ud-pos/best.pt --valid_path tasks/ud-syntax/en-test/en-ewt-test-pos.csv --filter "auto(512)" --fig_name results/gpt2-ud-pos/frequency_filter_weights.png
