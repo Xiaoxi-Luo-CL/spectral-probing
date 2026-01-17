@@ -4,6 +4,7 @@ import argparse
 import logging
 import os
 import sys
+import json
 
 import numpy as np
 
@@ -47,7 +48,6 @@ def parse_arguments():
     arg_parser.add_argument('classifier', help='classifier identifier')
 
     # experiment setup
-    arg_parser.add_argument('exp_path', help='path to experiment directory')
     arg_parser.add_argument(
         '-e', '--epochs', type=int, default=30,
         help='maximum number of epochs (default: 50)')
@@ -73,13 +73,14 @@ def parse_arguments():
 def main():
     args = parse_arguments()
     # logging.info('args:'+str(args))
-
+    task = '_' + args.lm_name + '_' + args.train_path.split('/')[-2]
+    exp_path = create_save_dir('results', task)
     # set up experiment directory and logging
-    setup_experiment(args.exp_path, prediction=args.prediction)
+    setup_experiment(exp_path, prediction=args.prediction)
 
     if args.prediction:
         logging.info("Running in prediction mode (no training).")
-        model_path = os.path.join(args.exp_path, 'best.pt')
+        model_path = os.path.join(exp_path, 'best.pt')
         if not os.path.exists(model_path):
             logging.error(
                 f"[Error] No pre-trained model available at '{model_path}'. Exiting.")
@@ -162,7 +163,7 @@ def main():
         ]
         pred_data = LabelledDataset(valid_data._inputs, pred_labels)
         pred_path = os.path.join(
-            args.exp_path, f'{os.path.splitext(os.path.basename(args.valid_path))[0]}-pred.csv')
+            exp_path, f'{os.path.splitext(os.path.basename(args.valid_path))[0]}-pred.csv')
         pred_data.save(pred_path)
         logging.info(
             f"Prediction completed with Acc: {np.mean(stats['accuracy']):.4f}, Loss: {np.mean(stats['loss']):.4f} (mean over batches).")
@@ -209,13 +210,13 @@ def main():
         cur_eval_loss = stats['loss'][-1]
 
         # save most recent model
-        path = os.path.join(args.exp_path, 'newest.pt')
+        path = os.path.join(exp_path, 'newest.pt')
         classifier.save(path)
         logging.info(f"Saved model from epoch {ep_idx + 1} to '{path}'.")
 
         # save best model
         if cur_eval_loss <= min(stats['loss']):
-            path = os.path.join(args.exp_path, 'best.pt')
+            path = os.path.join(exp_path, 'best.pt')
             classifier.save(path)
             logging.info(
                 f"Saved model with best loss {cur_eval_loss:.4f} to '{path}'.")
@@ -228,12 +229,25 @@ def main():
 
     logging.info(f"Training completed after {ep_idx + 1} epochs.")
 
+    try:
+        plot_filter_weights(classifier, exp_path, 'spectral_profile.png')
+        logging.info(
+            f"Plotted filter weights to '{exp_path}/spectral_profile.png'.")
+    except Exception as e:
+        logging.error(f"Could not plot filter weights: {e}")
+
+    config_path = os.path.join(exp_path, 'config.json')
+    if not os.path.exists(config_path):
+        config = vars(args)
+        with open(config_path, 'w') as f:
+            json.dump(config, f, indent=4)
+
 
 if __name__ == '__main__':
     main()
 
     # python classify.py tasks/wikiann/en-train.csv tasks/wikiann/en-dev.csv --repeat_labels bert-base-cased --embedding_caching "auto(512)" linear first-exp/  --random_seed 42 --prediction
 
-    # python classify.py tasks/mkqa/en-train.csv tasks/mkqa/en-dev.csv --repeat_labels gpt2 --embedding_caching "auto(512)" linear first-exp/  --random_seed 42 --embed_layer last
-
     # python classify.py tasks/ud-syntax/en-ewt-gum-train-pos.csv tasks/ud-syntax/en-ewt-gum-dev-pos.csv --repeat_labels bert-base-cased --embedding_caching "auto(512)" linear results/bert-ud-pos/ --random_seed 42
+
+    # python classify.py tasks/xnli/en-train.csv tasks/xnli/en-dev.csv gpt2 --embedding_caching "band(512, 0, 33)" linear --random_seed 42 --embedding_pooling last  --early_stop 5
