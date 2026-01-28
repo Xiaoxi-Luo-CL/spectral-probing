@@ -9,7 +9,7 @@ from collections import defaultdict
 def classify_dataset(
         classifier, criterion, optimizer,
         dataset, batch_size, mode='train',
-        repeat_labels=False, return_predictions=False):
+        repeat_labels=False, return_predictions=False, lambda_tv: float = 0.0):
     stats = defaultdict(list)
 
     # set model to training mode
@@ -35,12 +35,19 @@ def classify_dataset(
             # zero out previous gradients
             optimizer.zero_grad()
             # forward pass, ['labels', 'logits', 'flat_logits']
-            print('Performing forward pass...')
+            # print('Performing forward pass...')
             predictions = classifier(sentences)
 
             # propagate loss
             loss = criterion(predictions['logits'], labels)
-            loss.backward()
+            if lambda_tv > 0 and classifier._emb._frq_filter is not None:
+                diff = classifier._emb._frq_filter[1:] - \
+                    classifier._emb._frq_filter[:-1]
+                tv_loss = torch.sum(diff ** 2)
+                total_loss = loss + lambda_tv * tv_loss
+            else:
+                total_loss = loss
+            total_loss.backward()
             optimizer.step()
 
         # when evaluating, perform forward pass without gradients
@@ -50,6 +57,12 @@ def classify_dataset(
                 predictions = classifier(sentences)
                 # calculate loss
                 loss = criterion(predictions['logits'], labels)
+                if lambda_tv > 0 and classifier._emb._frq_filter is not None:
+                    diff = classifier._emb._frq_filter[1:] - \
+                        classifier._emb._frq_filter[:-1]
+                    tv_loss = torch.sum(diff ** 2)
+                else:
+                    total_loss = loss
 
         # calculate accuracy
         accuracy = criterion.get_accuracy(
@@ -57,6 +70,8 @@ def classify_dataset(
 
         # store statistics
         stats['loss'].append(float(loss.detach()))
+        if lambda_tv > 0 and classifier._emb._frq_filter is not None:
+            stats['tv_loss'].append(float(tv_loss.detach()))
         stats['accuracy'].append(float(accuracy))
 
         # store predictions
@@ -72,8 +87,12 @@ def classify_dataset(
         pct_complete = (1 - (num_remaining / len(dataset._inputs))) * 100
         sys.stdout.write(
             f"\r[{mode.capitalize()} | Batch {bidx + 1} | {pct_complete:.2f}%] "
-            f"Acc: {np.mean(stats['accuracy']):.4f}, Loss: {np.mean(stats['loss']):.4f}"
+            f"Acc: {np.mean(stats['accuracy']):.4f}, Loss: {np.mean(stats['loss']):.4f}\n"
         )
+        if lambda_tv > 0 and classifier._emb._frq_filter is not None:
+            sys.stdout.write(
+                f"TV Loss: {np.mean(stats['tv_loss']):.4f}\n"
+            )
         sys.stdout.flush()
 
     # clear line

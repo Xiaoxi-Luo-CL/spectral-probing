@@ -29,6 +29,9 @@ def parse_arguments():
     arg_parser.add_argument(
         '-p', '--prediction', action='store_true', default=False,
         help='set flag to only perform prediction on the validation data without training (default: False)')
+    arg_parser.add_argument(
+        '-lbd', '--lambda_tv', default=0.0, type=float,
+        help='set weight for total variation regularization term (default: 0.0)')
 
     # encoder setup
     arg_parser.add_argument('lm_name', help='embedding model identifier')
@@ -46,6 +49,13 @@ def parse_arguments():
 
     # classifier setup
     arg_parser.add_argument('classifier', help='classifier identifier')
+    arg_parser.add_argument(
+        '--frq_init', choices=['ones', 'decreasing', 'increasing', 'random'], type=str,
+        help='frequency filter initialization.')
+    arg_parser.add_argument(
+        '--frq_noise', type=float, default=0.1, help='frequency filter noise.')
+    arg_parser.add_argument(
+        '--frq_scale', type=float, default=1.0, help='frequency filter initialization scale.')
 
     # experiment setup
     arg_parser.add_argument(
@@ -72,11 +82,17 @@ def parse_arguments():
 
 def main():
     args = parse_arguments()
-    # logging.info('args:'+str(args))
+    logging.info('args:'+str(args))
     task = '_' + args.lm_name + '_' + args.train_path.split('/')[-2]
     exp_path = create_save_dir('results', task)
     # set up experiment directory and logging
     setup_experiment(exp_path, prediction=args.prediction)
+
+    config_path = os.path.join(exp_path, 'config.json')
+    if not os.path.exists(config_path):
+        config = vars(args)
+        with open(config_path, 'w') as f:
+            json.dump(config, f, indent=4)
 
     if args.prediction:
         logging.info("Running in prediction mode (no training).")
@@ -106,7 +122,8 @@ def main():
                              | set(valid_data.get_label_types()))
 
     # set up frequency filter
-    frq_filter = setup_filter(args.filter)
+    frq_filter = setup_filter(args.filter, frq_init=args.frq_init,
+                              frq_noise=args.frq_noise, frq_scale=args.frq_scale)
     frq_tuning = args.filter.startswith('auto(')
     logging.info(f"Loaded frequency filter '{args.filter}'.")
 
@@ -153,7 +170,8 @@ def main():
     if args.prediction:
         stats = classify_dataset(
             classifier, criterion, None, valid_data,
-            args.batch_size, repeat_labels=args.repeat_labels, mode='eval', return_predictions=True
+            args.batch_size, repeat_labels=args.repeat_labels, mode='eval',
+            return_predictions=True, lambda_tv=args.lambda_tv
         )
         # convert label indices back to string labels
         idx_lbl_map = {idx: lbl for idx, lbl in enumerate(label_types)}
@@ -187,7 +205,8 @@ def main():
         # iterate over training batches and update classifier weights
         ep_stats = classify_dataset(
             classifier, criterion, optimizer, train_data,
-            args.batch_size, repeat_labels=args.repeat_labels, mode='train'
+            args.batch_size, repeat_labels=args.repeat_labels,
+            mode='train', lambda_tv=args.lambda_tv
         )
         # print statistics
         logging.info(
@@ -198,7 +217,8 @@ def main():
         # iterate over batches in dev split
         ep_stats = classify_dataset(
             classifier, criterion, None, valid_data,
-            args.batch_size, repeat_labels=args.repeat_labels, mode='eval'
+            args.batch_size, repeat_labels=args.repeat_labels,
+            mode='eval', lambda_tv=args.lambda_tv
         )
         # store and print statistics
         for stat in ep_stats:
@@ -236,18 +256,14 @@ def main():
     except Exception as e:
         logging.error(f"Could not plot filter weights: {e}")
 
-    config_path = os.path.join(exp_path, 'config.json')
-    if not os.path.exists(config_path):
-        config = vars(args)
-        with open(config_path, 'w') as f:
-            json.dump(config, f, indent=4)
-
 
 if __name__ == '__main__':
     main()
 
-    # python classify.py tasks/wikiann/en-train.csv tasks/wikiann/en-dev.csv --repeat_labels bert-base-cased --embedding_caching "auto(512)" linear first-exp/  --random_seed 42 --prediction
+    # python classify.py tasks/wikiann/en-train.csv tasks/wikiann/en-dev.csv --repeat_labels bert-base-cased --embedding_caching "auto(512)" linear first-exp/ --random_seed 42 --prediction
 
     # python classify.py tasks/ud-syntax/en-ewt-gum-train-pos.csv tasks/ud-syntax/en-ewt-gum-dev-pos.csv --repeat_labels bert-base-cased --embedding_caching "auto(512)" linear results/bert-ud-pos/ --random_seed 42
 
     # python classify.py tasks/xnli/en-train.csv tasks/xnli/en-dev.csv gpt2 --embedding_caching "band(512, 0, 33)" linear --random_seed 42 --embedding_pooling last  --early_stop 5
+
+    # python classify.py tasks/ud-syntax/en-ewt-gum-train-relations.csv tasks/ud-syntax/en-ewt-gum-dev-relations.csv --repeat_labels bert-base-cased --embedding_caching "auto(512)" linear --random_seed 42

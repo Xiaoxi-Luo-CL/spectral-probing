@@ -12,7 +12,7 @@ def create_save_dir(folder='', suffix=''):
     Create a new directory with the current date and time as its name and return the path of the new directory.
     """
     subFolderName = re.sub(
-        r'[^0-9]', '', str(datetime.datetime.now()))[4:12]+suffix
+        r'[^0-9]', '', str(datetime.datetime.now()))[4:16]+suffix
     path = os.path.join(folder, subFolderName)
     os.makedirs(path, exist_ok=True)
     # my_mkdir(os.path.join(path, 'output'))
@@ -51,7 +51,7 @@ def setup_experiment(out_path, prediction=False):
     logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
-def setup_filter(filter_id):
+def setup_filter(filter_id, frq_init='ones', frq_noise=0.1, frq_scale=1.0):
     from models.encoders import PrismEncoder
 
     # set up filter definitions
@@ -89,7 +89,7 @@ def setup_filter(filter_id):
                 logging.error(
                     f"[Error] auto requires the argument 'max_freqs'. Exiting.")
                 exit(1)
-            return PrismEncoder.gen_auto_filter_initialization(filter_args[0])
+            return PrismEncoder.gen_auto_filter_initialization(filter_args[0], frq_init, frq_noise, frq_scale)
         else:
             logging.error(
                 f"[Error] Unknown filter type '{filter_match['name']}'. Exiting.")

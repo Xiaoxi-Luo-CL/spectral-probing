@@ -164,9 +164,11 @@ class PrismEncoder(nn.Module):
             # new maximum length without special tokens
             non_special_max_len = torch.max(torch.sum(non_special_mask, -1))
             non_special_embeddings = torch.zeros_like(
-                emb_tokens)[:, :non_special_max_len, :]  # (batch_size, new_max_len, hidden_dim)
+                # (batch_size, new_max_len, hidden_dim)
+                emb_tokens)[:, :non_special_max_len, :]
             non_special_attentions = torch.zeros_like(
-                att_tokens)[:, :non_special_max_len]  # (batch_size, new_max_len)
+                # (batch_size, new_max_len)
+                att_tokens)[:, :non_special_max_len]
             # iterate over each sequence due to variable length
             for sidx in range(emb_tokens.shape[0]):
                 # current sequence length up to which values should be filled
@@ -292,8 +294,16 @@ class PrismEncoder(nn.Module):
         return filters
 
     @staticmethod
-    def gen_auto_filter_initialization(filter_size):
-        return torch.ones(filter_size)
+    def gen_auto_filter_initialization(filter_size, init_strategy='ones', noise=1.0, scale=0.1):
+        # add small random noise to break symmetry
+        if init_strategy == 'ones':
+            return torch.ones(filter_size)*scale + torch.randn(filter_size) * noise
+        elif init_strategy == 'random':
+            return torch.randn(filter_size)*scale
+        elif init_strategy == 'decreasing':
+            return torch.linspace(scale, 0.0, steps=filter_size) + torch.randn(filter_size) * noise
+        else:  # 'increasing'
+            return torch.linspace(0.0, scale, steps=filter_size) + torch.randn(filter_size) * noise
 
     @staticmethod
     def dct(embeddings, norm=None):

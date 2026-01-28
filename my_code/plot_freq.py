@@ -70,5 +70,3 @@ def main():
 if __name__ == '__main__':
     main()
 # python -m my_code.plot_freq --model_folder results/01142307gpt2_mkqa/ --valid_path tasks/mkqa/en-dev.csv --filter "auto(512)" --embedding_pooling last
-
-# python -m my_code.plot_freq --model_path results/gpt2-ud-pos/best.pt --valid_path tasks/ud-syntax/en-test/en-ewt-test-pos.csv --filter "auto(512)" --fig_name results/gpt2-ud-pos/frequency_filter_weights.png
