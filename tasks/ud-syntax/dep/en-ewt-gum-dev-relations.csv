@@ -2000,7 +2000,6 @@
 "I took my Mustang here and it looked amazing after they were done , they did a great job , I 'm very satisfied with the results .","nsubj root nmod obj advmod cc nsubj conj xcomp mark nsubj cop advcl punct nsubj parataxis det amod obj punct nsubj cop advmod parataxis case det obl punct"
 "The paint and wheels looked like glass and the interior looked new !","det nsubj cc conj root case obl cc det nsubj conj xcomp punct"
 "Also , they have great customer service and a very knowledgeable staff","advmod punct nsubj root amod compound obj cc det advmod amod conj"
-"text","label"
 "Introduction","root"
 "Research on adult - learned second language ( L2 ) has provided considerable insight into the neurocognitive mechanisms underlying the learning and processing of L2 grammar [ 1 ] – [ 11 ] .","nsubj case compound punct amod amod nmod punct appos punct aux root amod obj case det amod nmod acl det obj cc conj case compound nmod punct dep punct case punct nmod punct punct"
 "Of interest here , studies suggest that , despite the difficulties in acquiring L2 grammar , adult learners can approximate native - like levels of use and neurocognitive processing [ 12 ] – [ 15 ] .","case obl advmod punct nsubj root mark punct case det obl mark acl compound obj punct amod nsubj aux ccomp compound punct amod obj case nmod cc amod conj punct dep punct case punct nmod punct punct"

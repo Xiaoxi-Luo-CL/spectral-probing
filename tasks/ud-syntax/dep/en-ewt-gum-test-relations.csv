@@ -2076,7 +2076,6 @@
 "Deep tissue massage helps with pain in neck and shoulders","amod compound nsubj root case obl case nmod cc conj"
 "Seth provides deep tissue massage which has significantly reduced the pain in my neck and shoulders and added flexibility and movement back to the area .","nsubj root amod compound obj nsubj aux advmod acl det obj case nmod nmod cc conj cc conj obj cc conj advmod case det obl punct"
 "He listens and is excellent in diagnosing , addressing and explaining the specific issues and suggesting exercises to use .","nsubj root cc cop conj mark advcl punct conj cc conj det amod obj cc conj obj mark acl punct"
-"text","label"
 "The prevalence of discrimination across racial groups in contemporary America :","det root case nmod case amod nmod case amod nmod punct"
 "Results from a nationally representative sample of adults","root case det advmod amod nmod case nmod"
 "Introduction .","root punct"

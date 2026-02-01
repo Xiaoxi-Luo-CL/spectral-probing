@@ -385,6 +385,15 @@ class UniversalDependenciesSentence:
         ]
         return pos
 
+    def get_head(self):
+        '''add by xiaoxi'''
+        return [w.head for token in self._tokens for w in token.to_words()]
+
+    def get_idx(self):
+        '''Add by xiaoxi. Word index starting from 1 in original annotation, 
+        we convert to starting from 0'''
+        return [w.idx for token in self._tokens for w in token.to_words()]
+
     def get_comments(self, stripped=True):
         return [c[1:].strip() for c in self._comments]
 

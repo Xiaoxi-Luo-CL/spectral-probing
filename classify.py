@@ -5,13 +5,12 @@ import logging
 import os
 import sys
 import json
-
+from collections import defaultdict
 import numpy as np
 
-from collections import defaultdict
-
 # local imports
-from utils.setup import *
+from utils.setup import (setup_experiment, create_save_dir,
+                         check_validity, setup_filter, plot_filter_weights)
 from utils.datasets import LabelledDataset
 from utils.training import classify_dataset
 from models.encoders import *
@@ -29,9 +28,6 @@ def parse_arguments():
     arg_parser.add_argument(
         '-p', '--prediction', action='store_true', default=False,
         help='set flag to only perform prediction on the validation data without training (default: False)')
-    arg_parser.add_argument(
-        '-lbd', '--lambda_tv', default=0.0, type=float,
-        help='set weight for total variation regularization term (default: 0.0)')
 
     # encoder setup
     arg_parser.add_argument('lm_name', help='embedding model identifier')
@@ -48,7 +44,11 @@ def parse_arguments():
         '-layer', '--embed_layer', type=int, default=None, help='layer for extracting embeddings (default: last layer)')
 
     # classifier setup
-    arg_parser.add_argument('classifier', help='classifier identifier')
+    arg_parser.add_argument('--classifier', choices=['linear', 'mlp'], default='linear',
+                            help='classifier identifier')
+    arg_parser.add_argument(
+        '--loss_type', choices=['classification', 'regression'],
+        default='classification', help='loss function identifier.')
     arg_parser.add_argument(
         '--frq_init', choices=['ones', 'decreasing', 'increasing', 'random'], type=str,
         help='frequency filter initialization.')
@@ -82,9 +82,10 @@ def parse_arguments():
 
 def main():
     args = parse_arguments()
-    logging.info('args:'+str(args))
+    check_validity(args)
     task = '_' + args.lm_name + '_' + args.train_path.split('/')[-2]
     exp_path = create_save_dir('results', task)
+
     # set up experiment directory and logging
     setup_experiment(exp_path, prediction=args.prediction)
 
@@ -109,17 +110,22 @@ def main():
 
     # set up data
     valid_data = LabelledDataset.from_path(args.valid_path)
-    label_types = sorted(set(valid_data.get_label_types()))
+    if args.loss_type == 'classification':
+        # list of all labels, if classification task
+        label_types = sorted(set(valid_data.get_label_types()))
+    else:
+        label_types = None
     logging.info(f"Loaded {valid_data} (dev).")
     if args.train_path.lower() != 'none':
         train_data = LabelledDataset.from_path(args.train_path)
         logging.info(f"Loaded {train_data} (train).")
-        # gather labels
-        if set(train_data.get_label_types()) < set(valid_data.get_label_types()):
-            logging.warning(
-                f"[Warning] Validation data contains labels unseen in the training data.")
-        label_types = sorted(set(train_data.get_label_types())
-                             | set(valid_data.get_label_types()))
+        if args.loss_type == 'classification':
+            # gather labels
+            if set(train_data.get_label_types()) < set(valid_data.get_label_types()):
+                logging.warning(
+                    f"[Warning] Validation data contains labels unseen in the training data.")
+            label_types = sorted(set(train_data.get_label_types())
+                                 | set(valid_data.get_label_types()))  # list of labels
 
     # set up frequency filter
     frq_filter = setup_filter(args.filter, frq_init=args.frq_init,
@@ -147,12 +153,14 @@ def main():
         logging.info(f"Loaded pre-trained encoder from '{model_path}'.")
 
     # load classifier and loss constructors based on identifier
-    classifier_constructor, loss_constructor = load_classifier(args.classifier)
+    classifier_constructor, loss_constructor = load_classifier(
+        args.classifier, args.loss_type)
 
     # setup classifier
     classifier = classifier_constructor(
         emb_model=encoder, classes=label_types
     )
+
     logging.info(f"Constructed classifier:\n{classifier}")
     # load pre-trained classifier
     if args.prediction:
@@ -171,7 +179,7 @@ def main():
         stats = classify_dataset(
             classifier, criterion, None, valid_data,
             args.batch_size, repeat_labels=args.repeat_labels, mode='eval',
-            return_predictions=True, lambda_tv=args.lambda_tv
+            return_predictions=True
         )
         # convert label indices back to string labels
         idx_lbl_map = {idx: lbl for idx, lbl in enumerate(label_types)}
@@ -206,8 +214,7 @@ def main():
         ep_stats = classify_dataset(
             classifier, criterion, optimizer, train_data,
             args.batch_size, repeat_labels=args.repeat_labels,
-            mode='train', lambda_tv=args.lambda_tv
-        )
+            mode='train')
         # print statistics
         logging.info(
             f"[Epoch {ep_idx + 1}/{args.epochs}] Train completed with "
@@ -218,8 +225,7 @@ def main():
         ep_stats = classify_dataset(
             classifier, criterion, None, valid_data,
             args.batch_size, repeat_labels=args.repeat_labels,
-            mode='eval', lambda_tv=args.lambda_tv
-        )
+            mode='eval')
         # store and print statistics
         for stat in ep_stats:
             stats[stat].append(np.mean(ep_stats[stat]))
@@ -260,10 +266,12 @@ def main():
 if __name__ == '__main__':
     main()
 
-    # python classify.py tasks/wikiann/en-train.csv tasks/wikiann/en-dev.csv --repeat_labels bert-base-cased --embedding_caching "auto(512)" linear first-exp/ --random_seed 42 --prediction
+    # python classify.py tasks/wikiann/en-train.csv tasks/wikiann/en-dev.csv --repeat_labels bert-base-cased --embedding_caching "auto(512)" --classifier linear first-exp/ --random_seed 42 --prediction
 
-    # python classify.py tasks/ud-syntax/en-ewt-gum-train-pos.csv tasks/ud-syntax/en-ewt-gum-dev-pos.csv --repeat_labels bert-base-cased --embedding_caching "auto(512)" linear results/bert-ud-pos/ --random_seed 42
+    # python classify.py tasks/ud-syntax/en-ewt-gum-train-pos.csv tasks/ud-syntax/en-ewt-gum-dev-pos.csv --repeat_labels bert-base-cased --embedding_caching "auto(512)" --classifier linear results/bert-ud-pos/ --random_seed 42
 
-    # python classify.py tasks/xnli/en-train.csv tasks/xnli/en-dev.csv gpt2 --embedding_caching "band(512, 0, 33)" linear --random_seed 42 --embedding_pooling last  --early_stop 5
+    # python classify.py tasks/xnli/en-train.csv tasks/xnli/en-dev.csv gpt2 --embedding_caching "band(512, 0, 33)" --classifier linear --random_seed 42 --embedding_pooling last  --early_stop 5
 
-    # python classify.py tasks/ud-syntax/en-ewt-gum-train-relations.csv tasks/ud-syntax/en-ewt-gum-dev-relations.csv --repeat_labels bert-base-cased --embedding_caching "auto(512)" linear --random_seed 42
+    # python classify.py tasks/ud-syntax/en-ewt-gum-train-relations.csv tasks/ud-syntax/en-ewt-gum-dev-relations.csv --repeat_labels bert-base-cased --embedding_caching "auto(512)" --classifier linear --random_seed 42
+
+    # python classify.py tasks/ud-syntax/position/en-ewt-gum-train-position.csv tasks/ud-syntax/position/en-ewt-gum-dev-position.csv --repeat_labels bert-base-cased --embedding_caching "auto(512)" --classifier linear --random_seed 42 --loss_type regression

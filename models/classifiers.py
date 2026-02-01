@@ -10,22 +10,22 @@ from models.losses import *
 
 
 class EmbeddingClassifier(nn.Module):
-    def __init__(self, emb_model, lbl_model, classes):
+    def __init__(self, emb_model, lbl_model, classes: None | list = None):
         super().__init__()
         # internal models
         self._emb = emb_model
         self._lbl = lbl_model
         # internal variables
         self._classes = classes
+        self.is_regression = (classes is None)
         # move model to GPU if available
         if torch.cuda.is_available():
             self.to(torch.device('cuda'))
 
     def __repr__(self):
+        mode = "Regression" if self._classes is None else f"Classification ({len(self._classes)} classes)"
         return f'''<{self.__class__.__name__}:
-	emb_model = {self._emb},
-	num_classes = {len(self._classes)}
->'''
+	emb_model = {self._emb}, mode = {mode}>'''
 
     def get_trainable_parameters(self):
         return list(self._emb.get_trainable_parameters()) + list(self._lbl.parameters())
@@ -53,22 +53,28 @@ class EmbeddingClassifier(nn.Module):
         # embed sentences (batch_size, seq_length) -> (batch_size, max_length, emb_dim)
         # if pooling, then emb_sentences: (batch_size, 1, emb_dim)
         emb_sentences, att_sentences = self._emb(sentences)
-        # logits for all tokens in all sentences + padding -inf (batch_size, max_len, num_labels)
+
+        # logits for all tokens in all sentences + padding (batch_size, max_len, num_labels)
+        out_dim = 1 if self.is_regression else len(self._classes)
+        init_val = float('-inf') if not self.is_regression else float('nan')
+
         logits = torch.ones(
             (att_sentences.shape[0],
-             att_sentences.shape[1], len(self._classes)),
+             att_sentences.shape[1], out_dim),
             device=emb_sentences.device
-        ) * float('-inf')
+        ) * init_val
         # get token embeddings of all sentences (total_tokens, emb_dim)
         emb_tokens = emb_sentences[att_sentences, :]
         # pass through classifier
         flat_logits = self._lbl(emb_tokens)  # (num_words, num_labels)
         # (batch_size, max_len, num_labels)
         logits[att_sentences, :] = flat_logits
-
-        labels = self.get_labels(logits.detach())
+        if self.is_regression:
+            predictions = logits.squeeze(-1)
+        else:
+            predictions = self.get_labels(logits.detach())
         results = {
-            'labels': labels,
+            'labels': predictions,
             'logits': logits,
             'flat_logits': flat_logits
         }
@@ -92,7 +98,22 @@ class EmbeddingClassifier(nn.Module):
 class LinearClassifier(EmbeddingClassifier):
     def __init__(self, emb_model, classes, bias=True):
         # instantiate linear classifier without bias
-        lbl_model = nn.Linear(emb_model.emb_dim, len(classes), bias=bias)
+        out_dim = len(classes) if classes is not None else 1
+        lbl_model = nn.Linear(emb_model.emb_dim, out_dim, bias=bias)
+        super().__init__(
+            emb_model=emb_model, lbl_model=lbl_model, classes=classes
+        )
+
+
+class MLPClassifier(EmbeddingClassifier):
+    def __init__(self, emb_model, classes, hidden_dim=128, bias=True):
+        out_dim = len(classes) if classes is not None else 1
+        # instantiate MLP classifier
+        lbl_model = nn.Sequential(
+            nn.Linear(emb_model.emb_dim, hidden_dim, bias=bias),
+            nn.ReLU(),
+            nn.Linear(hidden_dim, out_dim, bias=bias)
+        )
 
         super().__init__(
             emb_model=emb_model, lbl_model=lbl_model, classes=classes
@@ -103,9 +124,20 @@ class LinearClassifier(EmbeddingClassifier):
 # Helper Functions
 #
 
-def load_classifier(identifier):
+def load_classifier(identifier, loss_type):
     if identifier == 'linear':
-        return LinearClassifier, LabelLoss
+        classifier = LinearClassifier
+    elif identifier == 'mlp':
+        classifier = MLPClassifier
     else:
         raise ValueError(
             f"[Error] Unknown classifier specification '{identifier}'.")
+    if loss_type == 'classification':
+        loss = LabelLoss
+    elif loss_type == 'regression':
+        loss = RegressionLoss
+    else:
+        raise ValueError(
+            f"[Error] Unknown loss specification '{loss_type}'.")
+
+    return classifier, loss

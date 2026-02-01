@@ -20,14 +20,24 @@ def create_save_dir(folder='', suffix=''):
 
 
 def setup_experiment(out_path, prediction=False):
+    # setup logging
+    log_format = '%(message)s'
+    log_level = logging.INFO
+    logging.basicConfig(filename=os.path.join(
+        out_path, 'classify.log'), filemode='a',
+        format=log_format, level=log_level, force=True)
+
+    logger = logging.getLogger()
+    logger.addHandler(logging.StreamHandler(sys.stdout))
+
     if not os.path.exists(out_path):
         if prediction:
-            print(
+            logging.info(
                 f"Experiment path '{out_path}' does not exist. Cannot run prediction. Exiting.")
             exit(1)
 
         # if output dir does not exist, create it (new experiment)
-        print(f"Path '{out_path}' does not exist. Creating...")
+        logging.info(f"Path '{out_path}' does not exist. Creating...")
         os.mkdir(out_path)
     # if output dir exist, check if predicting
     # else:
@@ -40,15 +50,6 @@ def setup_experiment(out_path, prediction=False):
     #                 f"Path '{out_path}' already exists. Overwrite? [y/n] ")
     #         if response == 'n':
     #             exit(1)
-
-    # setup logging
-    log_format = '%(message)s'
-    log_level = logging.INFO
-    logging.basicConfig(filename=os.path.join(
-        out_path, 'classify.log'), filemode='a', format=log_format, level=log_level)
-
-    logger = logging.getLogger()
-    logger.addHandler(logging.StreamHandler(sys.stdout))
 
 
 def setup_filter(filter_id, frq_init='ones', frq_noise=0.1, frq_scale=1.0):
@@ -111,3 +112,10 @@ def plot_filter_weights(classifier, folder, fig_name):
     plt.ylabel('Weight')
     plt.grid()
     plt.savefig(folder + '/' + fig_name)
+
+
+def check_validity(args):
+    '''Check if arguments have no conflict'''
+    if 'relative' in args.train_path or 'position' in args.train_path:
+        assert args.loss_type == 'regression', \
+            "[Error] Relative/position embeddings can only be used with label classification tasks. Exiting."
