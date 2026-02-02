@@ -10,7 +10,7 @@ import numpy as np
 
 # local imports
 from utils.setup import (setup_experiment, create_save_dir,
-                         check_validity, setup_filter, plot_filter_weights)
+                         dir_name, setup_filter, analyze_filter)
 from utils.datasets import LabelledDataset
 from utils.training import classify_dataset
 from models.encoders import *
@@ -82,9 +82,8 @@ def parse_arguments():
 
 def main():
     args = parse_arguments()
-    check_validity(args)
-    task = '_' + args.lm_name + '_' + args.train_path.split('/')[-2]
-    exp_path = create_save_dir('results', task)
+    suffix, task_name = dir_name(args)
+    exp_path = create_save_dir('results', suffix)
 
     # set up experiment directory and logging
     setup_experiment(exp_path, prediction=args.prediction)
@@ -115,10 +114,10 @@ def main():
         label_types = sorted(set(valid_data.get_label_types()))
     else:
         label_types = None
-    logging.info(f"Loaded {valid_data} (dev).")
+    logging.info(f"Loaded {valid_data} (dev), size {len(valid_data)}.")
     if args.train_path.lower() != 'none':
         train_data = LabelledDataset.from_path(args.train_path)
-        logging.info(f"Loaded {train_data} (train).")
+        logging.info(f"Loaded {train_data} (train), size {len(train_data)}.")
         if args.loss_type == 'classification':
             # gather labels
             if set(train_data.get_label_types()) < set(valid_data.get_label_types()):
@@ -171,7 +170,12 @@ def main():
         logging.info(f"Loaded pre-trained classifier from '{model_path}'.")
 
     # setup loss
-    criterion = loss_constructor(label_types)
+    # if it is regression loss but not normalized_relative
+    if args.loss_type == 'regression' and task_name != 'normalized_relative':
+        criterion = loss_constructor(
+            label_types, round_acc=True)  # type:ignore
+    else:
+        criterion = loss_constructor(label_types)
     logging.info(f"Using criterion {criterion}.")
 
     # main prediction call (when only predicting on validation data w/o training)
@@ -256,7 +260,8 @@ def main():
     logging.info(f"Training completed after {ep_idx + 1} epochs.")
 
     try:
-        plot_filter_weights(classifier, exp_path, 'spectral_profile.png')
+        filter = classifier._emb._frq_filter.detach().cpu()
+        analyze_filter(filter, exp_path, 'spectral_profile.png')
         logging.info(
             f"Plotted filter weights to '{exp_path}/spectral_profile.png'.")
     except Exception as e:
@@ -265,13 +270,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-    # python classify.py tasks/wikiann/en-train.csv tasks/wikiann/en-dev.csv --repeat_labels bert-base-cased --embedding_caching "auto(512)" --classifier linear first-exp/ --random_seed 42 --prediction
-
-    # python classify.py tasks/ud-syntax/en-ewt-gum-train-pos.csv tasks/ud-syntax/en-ewt-gum-dev-pos.csv --repeat_labels bert-base-cased --embedding_caching "auto(512)" --classifier linear results/bert-ud-pos/ --random_seed 42
-
-    # python classify.py tasks/xnli/en-train.csv tasks/xnli/en-dev.csv gpt2 --embedding_caching "band(512, 0, 33)" --classifier linear --random_seed 42 --embedding_pooling last  --early_stop 5
-
-    # python classify.py tasks/ud-syntax/en-ewt-gum-train-relations.csv tasks/ud-syntax/en-ewt-gum-dev-relations.csv --repeat_labels bert-base-cased --embedding_caching "auto(512)" --classifier linear --random_seed 42
-
-    # python classify.py tasks/ud-syntax/position/en-ewt-gum-train-position.csv tasks/ud-syntax/position/en-ewt-gum-dev-position.csv --repeat_labels bert-base-cased --embedding_caching "auto(512)" --classifier linear --random_seed 42 --loss_type regression

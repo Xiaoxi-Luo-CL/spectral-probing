@@ -52,9 +52,10 @@ class LabelLoss(nn.Module):
 
 
 class RegressionLoss(nn.Module):
-    def __init__(self, classes=None):
+    def __init__(self, classes=None, round_acc=False):
         super().__init__()
         self._mse_loss = nn.MSELoss(reduction='mean')
+        self.round_acc = round_acc
 
     def __repr__(self):
         return f'<{self.__class__.__name__}: loss=MSE, acc=MSE>'
@@ -71,11 +72,18 @@ class RegressionLoss(nn.Module):
     def forward(self, logits, targets):
         mask = ~torch.isnan(logits)
         flat_logits = logits[mask].squeeze()
-        target_values = self._label2float(
-            targets, device=logits.device)
-
+        target_values = self._label2float(targets, logits.device)
         return self._mse_loss(flat_logits, target_values)
 
     def get_accuracy(self, logits, targets):
-        '''return mean square error as accuracy'''
-        return self.forward(logits, targets)
+        '''return accuracy after rounding to nearest integer'''
+        if self.round_acc:
+            mask = ~torch.isnan(logits)
+            flat_logits = logits[mask].squeeze()
+            target_tensor = self._label2float(targets, logits.device)
+            # as long as the prediction is within [3.5, 4.5), we think it is 4
+            preds = torch.round(flat_logits)
+            correct = (preds == target_tensor).float()
+            return correct.mean().item()
+        else:
+            return self.forward(logits, targets)

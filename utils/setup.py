@@ -5,6 +5,7 @@ import sys
 import datetime
 import torch
 import matplotlib.pyplot as plt
+import numpy as np
 
 
 def create_save_dir(folder='', suffix=''):
@@ -101,21 +102,39 @@ def setup_filter(filter_id, frq_init='ones', frq_noise=0.1, frq_scale=1.0):
         exit(1)
 
 
-def plot_filter_weights(classifier, folder, fig_name):
-    filter = classifier._emb._frq_filter.detach().cpu()
-    weight = torch.sigmoid(filter).numpy()
+def analyze_filter(filter, folder, fig_name):
+    weight = torch.sigmoid(filter)
 
     # draw the weight plot
-    plt.plot(weight)
+    plt.plot(weight.numpy())
     plt.title('Frequency Filter Weights')
     plt.xlabel('Frequency')
     plt.ylabel('Weight')
     plt.grid()
     plt.savefig(folder + '/' + fig_name)
+    plt.clf()
+    from IPython import embed
+    embed()
+    # treat weights as a distribution and analyze entropy
+    distribution = torch.softmax(filter, dim=0).numpy()
+    # save distribution
+    np.save(folder + '/distribution.npy', distribution)
+    # compute entropy
+    entropy = -np.sum(distribution * np.log(distribution + 1e-12))
+    logging.info(f"Entropy: {entropy}")
 
 
-def check_validity(args):
-    '''Check if arguments have no conflict'''
+def dir_name(args):
+    '''Check if arguments have no conflict. If not, return a directory name based on the arguments.'''
     if 'relative' in args.train_path or 'position' in args.train_path:
         assert args.loss_type == 'regression', \
             "[Error] Relative/position embeddings can only be used with label classification tasks. Exiting."
+
+    if 'bert' in args.lm_name:
+        model = 'bert'
+    elif 'gpt2' in args.lm_name:
+        model = 'gpt2'
+    else:
+        raise ValueError(f"[Error] Unknown LM name {args.lm_name}. Exiting.")
+    task_name = args.train_path.split('/')[-2]
+    return '_' + model + '_' + task_name, task_name
