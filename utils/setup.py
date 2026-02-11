@@ -20,12 +20,12 @@ def create_save_dir(folder='', suffix=''):
     return path
 
 
-def setup_experiment(out_path, prediction=False):
+def setup_experiment(out_path, prediction=False, log_name='classify.log', mode='a'):
     # setup logging
     log_format = '%(message)s'
     log_level = logging.INFO
     logging.basicConfig(filename=os.path.join(
-        out_path, 'classify.log'), filemode='a',
+        out_path, log_name), filemode=mode,
         format=log_format, level=log_level, force=True)
 
     logger = logging.getLogger()
@@ -106,6 +106,7 @@ def analyze_filter(filter, folder, fig_name):
     weight = torch.sigmoid(filter)
 
     # draw the weight plot
+    plt.ylim(0, 1)
     plt.plot(weight.numpy())
     plt.title('Frequency Filter Weights')
     plt.xlabel('Frequency')
@@ -113,28 +114,42 @@ def analyze_filter(filter, folder, fig_name):
     plt.grid()
     plt.savefig(folder + '/' + fig_name)
     plt.clf()
-    from IPython import embed
-    embed()
     # treat weights as a distribution and analyze entropy
     distribution = torch.softmax(filter, dim=0).numpy()
     # save distribution
     np.save(folder + '/distribution.npy', distribution)
     # compute entropy
     entropy = -np.sum(distribution * np.log(distribution + 1e-12))
+
+    logging.info(
+        f"\nFilter analysis results saved to {folder}/{fig_name} and distribution.npy")
     logging.info(f"Entropy: {entropy}")
 
 
-def dir_name(args):
+def check_args(args):
     '''Check if arguments have no conflict. If not, return a directory name based on the arguments.'''
     if 'relative' in args.train_path or 'position' in args.train_path:
         assert args.loss_type == 'regression', \
             "[Error] Relative/position embeddings can only be used with label classification tasks. Exiting."
 
-    if 'bert' in args.lm_name:
-        model = 'bert'
-    elif 'gpt2' in args.lm_name:
-        model = 'gpt2'
+    if not args.repeat_labels:
+        assert args.embedding_pooling is not None, \
+            "Embedding pooling must be specified when repeat_labels is False."
+    if args.repeat_labels and args.embedding_pooling is not None:
+        logging.warning(
+            "repeat_labels=True with embedding_pooling is not common practice.")
+    if args.prediction:
+        assert args.out_path is not None, "Output path must be specified when running prediction."
+        # assert path exists
+        assert os.path.exists(
+            args.out_path), f"Output path '{args.out_path}' does not exist."
+
+
+def dir_name(args):
+    if '/' in args.lm_name:
+        model = args.lm_name.split('/')[-1]
     else:
-        raise ValueError(f"[Error] Unknown LM name {args.lm_name}. Exiting.")
+        model = args.lm_name
     task_name = args.train_path.split('/')[-2]
-    return '_' + model + '_' + task_name, task_name
+    lan = args.train_path.split('/')[-1].split('-')[0]
+    return '_' + model + '_' + task_name + '_' + lan, task_name, lan

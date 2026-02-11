@@ -3,14 +3,13 @@
 import argparse
 import logging
 import os
-import sys
 import json
 from collections import defaultdict
 import numpy as np
 
 # local imports
 from utils.setup import (setup_experiment, create_save_dir,
-                         dir_name, setup_filter, analyze_filter)
+                         dir_name, setup_filter, analyze_filter, check_args)
 from utils.datasets import LabelledDataset
 from utils.training import classify_dataset
 from models.encoders import *
@@ -50,8 +49,8 @@ def parse_arguments():
         '--loss_type', choices=['classification', 'regression'],
         default='classification', help='loss function identifier.')
     arg_parser.add_argument(
-        '--frq_init', choices=['ones', 'decreasing', 'increasing', 'random'], type=str,
-        help='frequency filter initialization.')
+        '--frq_init', choices=['ones', 'decreasing', 'increasing', 'random'],
+        default='ones', type=str, help='frequency filter initialization.')
     arg_parser.add_argument(
         '--frq_noise', type=float, default=0.1, help='frequency filter noise.')
     arg_parser.add_argument(
@@ -82,20 +81,19 @@ def parse_arguments():
 
 def main():
     args = parse_arguments()
-    suffix, task_name = dir_name(args)
-    exp_path = create_save_dir('results', suffix)
+    check_args(args)
+    suffix, task_name, lan = dir_name(args)
 
-    # set up experiment directory and logging
+    if not args.prediction:
+        exp_path = create_save_dir('results', suffix)
+        # set up experiment directory and logging
+    else:
+        exp_path = args.exp_path
     setup_experiment(exp_path, prediction=args.prediction)
 
-    config_path = os.path.join(exp_path, 'config.json')
-    if not os.path.exists(config_path):
-        config = vars(args)
-        with open(config_path, 'w') as f:
-            json.dump(config, f, indent=4)
-
+    logging.info(args)
     if args.prediction:
-        logging.info("Running in prediction mode (no training).")
+        logging.info("===Running in prediction mode (no training).===")
         model_path = os.path.join(exp_path, 'best.pt')
         if not os.path.exists(model_path):
             logging.error(
@@ -115,7 +113,8 @@ def main():
     else:
         label_types = None
     logging.info(f"Loaded {valid_data} (dev), size {len(valid_data)}.")
-    if args.train_path.lower() != 'none':
+
+    if not args.prediction and args.train_path.lower() != 'none':
         train_data = LabelledDataset.from_path(args.train_path)
         logging.info(f"Loaded {train_data} (train), size {len(train_data)}.")
         if args.loss_type == 'classification':
@@ -142,6 +141,7 @@ def main():
         emb_tuning=args.embedding_tuning, emb_pooling=pooling_strategy,
         cache=({} if args.embedding_caching else None), embed_layer=args.embed_layer)
     logging.info(f"Constructed {encoder}.")
+
     if args.prediction:
         # with torch.serialization.safe_globals([nn.modules.linear.Linear]):
         encoder = PrismEncoder.load(
@@ -168,7 +168,8 @@ def main():
                 model_path, emb_model=encoder
             )
         logging.info(f"Loaded pre-trained classifier from '{model_path}'.")
-
+    classifier = classifier.to(torch.device(
+        'cuda' if torch.cuda.is_available() else 'cpu'))
     # setup loss
     # if it is regression loss but not normalized_relative
     if args.loss_type == 'regression' and task_name != 'normalized_relative':
@@ -185,20 +186,25 @@ def main():
             args.batch_size, repeat_labels=args.repeat_labels, mode='eval',
             return_predictions=True
         )
-        # convert label indices back to string labels
-        idx_lbl_map = {idx: lbl for idx, lbl in enumerate(label_types)}
-        pred_labels = [
-            [idx_lbl_map[p] for p in preds]
-            for preds in stats['predictions']
-        ]
-        pred_data = LabelledDataset(valid_data._inputs, pred_labels)
-        pred_path = os.path.join(
-            exp_path, f'{os.path.splitext(os.path.basename(args.valid_path))[0]}-pred.csv')
-        pred_data.save(pred_path)
         logging.info(
             f"Prediction completed with Acc: {np.mean(stats['accuracy']):.4f}, Loss: {np.mean(stats['loss']):.4f} (mean over batches).")
-        logging.info(
-            f"Saved results from {pred_data} to '{pred_path}'. Exiting.")
+
+        # convert label indices back to string labels
+        if args.loss_type == 'classification':
+            idx_lbl_map = {idx: lbl for idx, lbl in enumerate(label_types)}
+
+            pred_labels = [
+                [idx_lbl_map[p] for p in preds]
+                for preds in stats['predictions']
+            ]
+            pred_data = LabelledDataset(valid_data._inputs, pred_labels)
+            pred_path = os.path.join(
+                exp_path, f'{os.path.splitext(os.path.basename(args.valid_path))[0]}-pred.csv')
+            pred_data.save(pred_path)
+
+            logging.info(
+                f"Saved results from {pred_data} to '{pred_path}'. Exiting.")
+
         exit()
 
     # setup optimizer and scheduler
@@ -258,6 +264,14 @@ def main():
             break
 
     logging.info(f"Training completed after {ep_idx + 1} epochs.")
+
+    config_path = os.path.join(exp_path, 'config.json')
+    if not os.path.exists(config_path):
+        config = vars(args)
+        config['task_name'] = task_name
+        config['language'] = lan
+        with open(config_path, 'w') as f:
+            json.dump(config, f, indent=4)
 
     try:
         filter = classifier._emb._frq_filter.detach().cpu()

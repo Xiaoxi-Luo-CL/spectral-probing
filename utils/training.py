@@ -30,13 +30,14 @@ def classify_dataset(
             labels = dataset.repeat_batch_labels(
                 sentences, labels, classifier._emb)
 
+        label_type = dataset.get_label_level()
         # when training, perform both forward and backward pass
         if mode == 'train':
             # zero out previous gradients
             optimizer.zero_grad()
             # forward pass, ['labels', 'logits', 'flat_logits']
             # print('Performing forward pass...')
-            predictions = classifier(sentences)
+            predictions = classifier(sentences, label_type=label_type)
 
             # propagate loss
             loss = criterion(predictions['logits'], labels)
@@ -47,7 +48,7 @@ def classify_dataset(
         elif mode == 'eval':
             with torch.no_grad():
                 # forward pass
-                predictions = classifier(sentences)
+                predictions = classifier(sentences, label_type=label_type)
                 # calculate loss
                 loss = criterion(predictions['logits'], labels)
 

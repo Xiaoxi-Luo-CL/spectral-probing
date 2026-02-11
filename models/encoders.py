@@ -16,15 +16,25 @@ class PrismEncoder(nn.Module):
         # load transformer
         transformers.logging.set_verbosity_error()
 
-        if lm_name == 'gpt2':
+        if lm_name in ['gpt2', 'bigscience/bloom-560m', 'bigscience/bloom-3b']:
             self._tok = transformers.AutoTokenizer.from_pretrained(
                 lm_name, use_fast=True, add_prefix_space=True)
             self._tok.pad_token = self._tok.eos_token
         else:
             self._tok = transformers.AutoTokenizer.from_pretrained(
                 lm_name, use_fast=True)
-        self._lm = transformers.AutoModel.from_pretrained(
-            lm_name, return_dict=True)
+
+        if lm_name in ["mistralai/Ministral-3-3B-Base-2512"]:
+            # self._lm = Mistral3ForConditionalGeneration.from_pretrained(
+            # lm_name, return_dict=True, device_map="auto")
+            self._lm = transformers.AutoModel.from_pretrained(
+                lm_name, return_dict=True, torch_dtype=torch.float32, device_map="auto")
+            self._config = self._lm.config.text_config
+        else:
+            self._lm = transformers.AutoModel.from_pretrained(
+                lm_name, return_dict=True, torch_dtype=torch.float32, device_map="auto")
+            self._config = self._lm.config
+
         self._emb_tuning = emb_tuning
         # load cache
         # {hash: torch.tensor (num_layers, sen_len, emb_dim)}
@@ -39,8 +49,8 @@ class PrismEncoder(nn.Module):
         self._frq_filter = None if frq_filter is None else nn.Parameter(
             frq_filter)
         # public variables
-        self.emb_dim = self._lm.config.hidden_size
-        self.num_layers = self._lm.config.num_hidden_layers
+        self.emb_dim = self._config.hidden_size
+        self.num_layers = self._config.num_hidden_layers
 
     def __repr__(self):
         return \
@@ -98,14 +108,14 @@ class PrismEncoder(nn.Module):
             self._frq_filter.requires_grad_(False)
         return self
 
-    def forward(self, sentences):
+    def forward(self, sentences, label_type):
         # embed sentences (standard last-layer encoding), removing places
         # corresponding to special tokens
         if self._emb_tuning:
-            emb_tokens, att_tokens = self.embed(sentences)
+            emb_tokens, att_tokens = self.embed(sentences, label_type)
         else:
             with torch.no_grad():
-                emb_tokens, att_tokens = self.embed(sentences)
+                emb_tokens, att_tokens = self.embed(sentences, label_type)
 
         # apply filter if set
         if self._frq_filter is not None:
@@ -131,16 +141,20 @@ class PrismEncoder(nn.Module):
 
         return emb_tokens, att_tokens
 
-    def embed(self, sentences):
+    def embed(self, sentences, label_type):
         # try retrieving embeddings from cache
         emb_cache = self.retrieve(sentences)
         if emb_cache is not None:
             emb_tokens, att_tokens = emb_cache
             return emb_tokens, att_tokens
         # compute embeddings if not in cache
-        tok_sentences = self.tokenize(sentences)
-        # split_sentences = [s.split(' ') for s in sentences]
-        # tok_sentences = self.tokenize(split_sentences, tokenized=True)
+        # tok_sentences = self.tokenize(sentences)
+        if label_type == 'token':
+            tok_sentences = self.tokenize(
+                [s.split(' ') for s in sentences], tokenized=True)
+        else:
+            tok_sentences = self.tokenize(sentences)
+
         model_inputs = {
             k: tok_sentences[k] for k in ['input_ids', 'token_type_ids', 'attention_mask']
             if k in tok_sentences
@@ -152,7 +166,7 @@ class PrismEncoder(nn.Module):
         if self._embed_layer is not None:
             hidden_states = model_outputs.hidden_states[self._embed_layer]
         else:
-            hidden_states = model_outputs.last_hidden_state
+            hidden_states = model_outputs.hidden_states[-1]
         emb_tokens, att_tokens = hidden_states, tok_sentences['attention_mask'].bool(
         )
 
@@ -303,6 +317,7 @@ class PrismEncoder(nn.Module):
         elif init_strategy == 'decreasing':
             return torch.linspace(scale, 0.0, steps=filter_size) + torch.randn(filter_size) * noise
         else:  # 'increasing'
+            assert init_strategy == 'increasing'
             return torch.linspace(0.0, scale, steps=filter_size) + torch.randn(filter_size) * noise
 
     @staticmethod
@@ -386,12 +401,16 @@ class PrismEncoder(nn.Module):
     def retrieve(self, sentences):
         if self._cache is None:
             return None
-
         max_len = 0
+
+        if 'max_position_embeddings' in self._config:
+            max_position_embeddings = self._config.max_position_embeddings
+        else:
+            max_position_embeddings = 1024  # just follow bert
         emb_tokens = torch.zeros(
-            (len(sentences), self._lm.config.max_position_embeddings, self.emb_dim))
+            (len(sentences), max_position_embeddings, self.emb_dim))
         att_tokens = torch.zeros(
-            (len(sentences), self._lm.config.max_position_embeddings), dtype=torch.bool)
+            (len(sentences), max_position_embeddings), dtype=torch.bool)
 
         # iterate over sentences
         for sidx, sentence in enumerate(sentences):

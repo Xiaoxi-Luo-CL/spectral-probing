@@ -29,16 +29,18 @@ def main():
     sentiment_map = {1: '-', 2: '-', 3: 'o', 4: '+', 5: '+'}
 
     for language in languages:
-        # amazon = load_dataset('amazon_reviews_multi',
-        #   language, trust_remote_code=True)
-        amazon = load_dataset('mteb/amazon_reviews_multi',
+        amazon = load_dataset('amazon_reviews_multi',
                               language, trust_remote_code=True)
+        # amazon = load_dataset('mteb/amazon_reviews_multi',
+        #   language, trust_remote_code = True)
 
         for split_name, split in amazon.items():
             # gather relevant fields for all instances
             print(f"Converting '{language}' ({split_name}) data...")
             texts, sentiments, topics = [], [], []
             for idx, instance in enumerate(split):
+                from IPython import embed
+                embed()
                 texts.append(instance['review_body'])
                 sentiments.append(sentiment_map[instance['stars']])
                 topics.append(instance['product_category'])

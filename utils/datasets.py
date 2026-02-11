@@ -142,7 +142,6 @@ class LabelledDataset:
                 [s.split(' ') for s in inputs], tokenized=True)
         else:
             tok_inputs = encoder.tokenize(inputs)
-
         lbl_cursor = -1
         for sidx in range(len(inputs)):
             if self.get_label_level() == 'token':

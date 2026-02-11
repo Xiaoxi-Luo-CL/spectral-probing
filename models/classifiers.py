@@ -49,10 +49,10 @@ class EmbeddingClassifier(nn.Module):
             emb_model=emb_model, lbl_model=lbl_model, classes=classes
         )
 
-    def forward(self, sentences):
+    def forward(self, sentences, label_type):
         # embed sentences (batch_size, seq_length) -> (batch_size, max_length, emb_dim)
         # if pooling, then emb_sentences: (batch_size, 1, emb_dim)
-        emb_sentences, att_sentences = self._emb(sentences)
+        emb_sentences, att_sentences = self._emb(sentences, label_type)
 
         # logits for all tokens in all sentences + padding (batch_size, max_len, num_labels)
         out_dim = 1 if self.is_regression else len(self._classes)

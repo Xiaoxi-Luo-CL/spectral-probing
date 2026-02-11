@@ -43,6 +43,8 @@ def load_treebanks(path):
 
 def main():
     args = parse_arguments()
+    if not os.path.exists(args.out_path):
+        os.makedirs(args.out_path)
 
     # load treebank splits and relation classes
     treebanks = load_treebanks(args.input_path)

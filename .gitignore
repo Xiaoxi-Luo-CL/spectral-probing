@@ -8,9 +8,11 @@ __pycache__/
 # *.csv
 # *.conllu
 results/
+archive/
 *.err
 *.out
 slurm.sh
+slurm/
 
 # Distribution / packaging
 .Python
