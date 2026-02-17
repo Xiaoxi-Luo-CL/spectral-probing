@@ -11,12 +11,14 @@ class PrismEncoder(nn.Module):
     def __init__(
             self, lm_name, frq_filter, frq_tuning=False,
             emb_tuning=False, emb_pooling=None, specials=False,
-            cache=None, embed_layer=None):
+            cache=None, embed_layer=None, max_length=512):
         super().__init__()
         # load transformer
         transformers.logging.set_verbosity_error()
 
-        if lm_name in ['gpt2', 'bigscience/bloom-560m', 'bigscience/bloom-3b']:
+        self.max_length = max_length
+        if lm_name in ['gpt2', 'bigscience/bloom-560m', 'bigscience/bloom-1b1',
+                       'bigscience/bloom-1b7', 'bigscience/bloom-3b', 'bigscience/bloom-7b1']:
             self._tok = transformers.AutoTokenizer.from_pretrained(
                 lm_name, use_fast=True, add_prefix_space=True)
             self._tok.pad_token = self._tok.eos_token
@@ -210,7 +212,7 @@ class PrismEncoder(nn.Module):
                                       for s in sentences], [s[1] for s in sentences]
             tok_sentences = self._tok(
                 sentences1, sentences2,
-                padding=True, truncation=True,
+                padding=True, truncation=True, max_length=self.max_length,
                 return_tensors='pt', return_special_tokens_mask=True,
                 return_offsets_mapping=True, is_split_into_words=tokenized
             )
@@ -218,7 +220,7 @@ class PrismEncoder(nn.Module):
         else:
             tok_sentences = self._tok(
                 sentences,
-                padding=True, truncation=True,
+                padding=True, truncation=True, max_length=self.max_length,
                 return_tensors='pt', return_special_tokens_mask=True,
                 return_offsets_mapping=True, is_split_into_words=tokenized
             )
@@ -402,15 +404,10 @@ class PrismEncoder(nn.Module):
         if self._cache is None:
             return None
         max_len = 0
-
-        if 'max_position_embeddings' in self._config:
-            max_position_embeddings = self._config.max_position_embeddings
-        else:
-            max_position_embeddings = 1024  # just follow bert
         emb_tokens = torch.zeros(
-            (len(sentences), max_position_embeddings, self.emb_dim))
+            (len(sentences), self.max_length, self.emb_dim))
         att_tokens = torch.zeros(
-            (len(sentences), max_position_embeddings), dtype=torch.bool)
+            (len(sentences), self.max_length), dtype=torch.bool)
 
         # iterate over sentences
         for sidx, sentence in enumerate(sentences):

@@ -7,7 +7,7 @@ __pycache__/
 *.so
 # *.csv
 # *.conllu
-results/
+# results/
 archive/
 *.err
 *.out

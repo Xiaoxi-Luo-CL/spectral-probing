@@ -1,10 +1,10 @@
 #!/bin/bash
 
 #SBATCH --job-name=spectral
-#SBATCH --time=12:00:00
+#SBATCH --time=1:00:00
 #SBATCH --mem=100GB
 #SBATCH --partition=ALL
-#SBATCH -x watgpu1008
+#SBATCH -x watgpu1008,watgpu408
 #SBATCH --cpus-per-task=1
 #SBATCH --gres=gpu:1
 

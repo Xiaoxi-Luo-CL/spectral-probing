@@ -2,7 +2,6 @@ import csv
 import sys
 
 import numpy as np
-from transformers import GPT2TokenizerFast
 
 
 class LabelledDataset:

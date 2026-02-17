@@ -70,16 +70,16 @@ def main():
         torch.random.manual_seed(config['random_seed'])
 
     valid_data = LabelledDataset.from_path(config['valid_path'])
-    if config['loss_type'] == 'classification':
-        label_types = sorted(set(valid_data.get_label_types()))
-    else:
-        label_types = None
-    logging.info(f"Loaded {valid_data} (dev), size {len(valid_data)}.")
 
-    from IPython import embed
-    embed()  # for debugging
+    checkpoint = torch.load(model_path, map_location='cpu', weights_only=False)
+    assert 'classes' in checkpoint
+    label_types = checkpoint['classes']
+    logging.info(
+        f"Successfully loaded {len(label_types) if label_types else 0} classes from checkpoint.")
+
+    frq_tuning = config.get('filter', '').startswith('auto(')
     encoder = PrismEncoder.load(
-        model_path, frq_filter=None, frq_tuning=False,
+        model_path, frq_filter=None, frq_tuning=frq_tuning,
         emb_tuning=config['embedding_tuning'], emb_pooling=None, cache=None
     )
     logging.info(f"Loaded pre-trained encoder from '{model_path}'.")
@@ -111,13 +111,12 @@ def main():
 
     classifier.eval()
     orig_filter = classifier._emb._frq_filter.detach().clone()
-
     results = defaultdict(dict)
     if args.perturbe_filter_mode is not None:
-        modes = ['orig'] + [args.perturbe_filter_mode]
+        modes = [('orig', None)] + [args.perturbe_filter_mode]
     else:
-        modes = [('reverse', None), ('shuffle', None), ('plus', 0.1), ('plus', -0.1),
-                 ('plus', -0.2), ('plus', -0.3), ('multiply', 2.0), ('multiply', 0.5), ('orig', None)]
+        modes = [('orig', None), ('reverse', None), ('shuffle', None), ('plus', 0.1),
+                 ('plus', -0.1), ('plus', -0.2), ('plus', -0.3), ('multiply', 2.0), ('multiply', 0.5)]
 
     for (mode, para) in modes:
         perturbed = shuffle_weight(orig_filter, mode=mode, para=para)
