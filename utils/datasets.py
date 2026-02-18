@@ -99,39 +99,39 @@ class LabelledDataset:
             # yield batch + number of remaining instances
             yield inputs, labels, len(remaining_idcs)
 
-    def repeat_batch_labels_old(self, inputs, labels, encoder):
-        rep_labels = []
+    # def repeat_batch_labels_old(self, inputs, labels, encoder):
+    #     rep_labels = []
 
-        if self.get_label_level() == 'token':
-            tok_inputs = encoder.tokenize(
-                [s.split(' ') for s in inputs], tokenized=True)
-        else:
-            tok_inputs = encoder.tokenize(inputs)
+    #     if self.get_label_level() == 'token':
+    #         tok_inputs = encoder.tokenize(
+    #             [s.split(' ') for s in inputs], tokenized=True)
+    #     else:
+    #         tok_inputs = encoder.tokenize(inputs)
 
-        lbl_cursor = -1
-        for sidx in range(len(inputs)):
-            # convert token IDs to pieces
-            pieces = encoder._tok.convert_ids_to_tokens(
-                tok_inputs['input_ids'][sidx])
-            for tidx in range(tok_inputs['attention_mask'][sidx].sum()):
-                # skip special tokens
-                if (not encoder._specials) and (tok_inputs['special_tokens_mask'][sidx, tidx]):
-                    continue
-                # repeat token labels across all sub-tokens
-                if self.get_label_level() == 'token':
-                    # check for start of new token
-                    if tok_inputs['offset_mapping'][sidx, tidx, 0] == 0:
-                        # check for incorrect offset mapping in SentencePiece tokenizers (e.g. XLM-R)
-                        # example: ',' -> '▁', ',' with [0, 1], [0, 1] which increment the label cursor prematurely
-                        # https://github.com/huggingface/transformers/issues/9637
-                        if (tidx > 0) and (pieces[tidx - 1] != '▁'):
-                            lbl_cursor += 1
-                    rep_labels.append(labels[lbl_cursor])
-                # repeat single sequence label across all sequence tokens
-                else:
-                    rep_labels.append(labels[sidx])
+    #     lbl_cursor = -1
+    #     for sidx in range(len(inputs)):
+    #         # convert token IDs to pieces
+    #         pieces = encoder._tok.convert_ids_to_tokens(
+    #             tok_inputs['input_ids'][sidx])
+    #         for tidx in range(tok_inputs['attention_mask'][sidx].sum()):
+    #             # skip special tokens
+    #             if (not encoder._specials) and (tok_inputs['special_tokens_mask'][sidx, tidx]):
+    #                 continue
+    #             # repeat token labels across all sub-tokens
+    #             if self.get_label_level() == 'token':
+    #                 # check for start of new token
+    #                 if tok_inputs['offset_mapping'][sidx, tidx, 0] == 0:
+    #                     # check for incorrect offset mapping in SentencePiece tokenizers (e.g. XLM-R)
+    #                     # example: ',' -> '▁', ',' with [0, 1], [0, 1] which increment the label cursor prematurely
+    #                     # https://github.com/huggingface/transformers/issues/9637
+    #                     if (tidx > 0) and (pieces[tidx - 1] != '▁'):
+    #                         lbl_cursor += 1
+    #                 rep_labels.append(labels[lbl_cursor])
+    #             # repeat single sequence label across all sequence tokens
+    #             else:
+    #                 rep_labels.append(labels[sidx])
 
-        return rep_labels
+    #     return rep_labels
 
     def repeat_batch_labels(self, inputs, labels, encoder):
         rep_labels = []

@@ -1,8 +1,6 @@
 import torch
 import torch.nn as nn
-
-from models.encoders import *
-from models.losses import *
+from models.losses import LabelLoss, RegressionLoss
 
 #
 # Base Classifier
@@ -50,6 +48,7 @@ class EmbeddingClassifier(nn.Module):
         )
 
     def forward(self, sentences, label_type):
+        '''Get predicted labels (classification) or values (regression) for sentences.'''
         # embed sentences (batch_size, seq_length) -> (batch_size, max_length, emb_dim)
         # if pooling, then emb_sentences: (batch_size, 1, emb_dim)
         emb_sentences, att_sentences = self._emb(sentences, label_type)
@@ -95,7 +94,7 @@ class EmbeddingClassifier(nn.Module):
 #
 
 
-class LinearClassifier(EmbeddingClassifier):
+class LinearProbe(EmbeddingClassifier):
     def __init__(self, emb_model, classes, bias=True):
         # instantiate linear classifier without bias
         out_dim = len(classes) if classes is not None else 1
@@ -105,7 +104,7 @@ class LinearClassifier(EmbeddingClassifier):
         )
 
 
-class MLPClassifier(EmbeddingClassifier):
+class MLPProbe(EmbeddingClassifier):
     def __init__(self, emb_model, classes, hidden_dim=128, bias=True):
         out_dim = len(classes) if classes is not None else 1
         # instantiate MLP classifier
@@ -126,12 +125,12 @@ class MLPClassifier(EmbeddingClassifier):
 
 def load_classifier(identifier, loss_type):
     if identifier == 'linear':
-        classifier = LinearClassifier
+        probe = LinearProbe
     elif identifier == 'mlp':
-        classifier = MLPClassifier
+        probe = MLPProbe
     else:
         raise ValueError(
-            f"[Error] Unknown classifier specification '{identifier}'.")
+            f"[Error] Unknown probe specification '{identifier}'.")
     if loss_type == 'classification':
         loss = LabelLoss
     elif loss_type == 'regression':
@@ -140,4 +139,4 @@ def load_classifier(identifier, loss_type):
         raise ValueError(
             f"[Error] Unknown loss specification '{loss_type}'.")
 
-    return classifier, loss
+    return probe, loss

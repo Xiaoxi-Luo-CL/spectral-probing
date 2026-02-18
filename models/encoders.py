@@ -20,7 +20,8 @@ class PrismEncoder(nn.Module):
         tokenizer_kwargs = {'use_fast': True}
         if any(m in lm_name for m in ['gpt2', 'bloom', 'Mistral', 'aya']):
             tokenizer_kwargs['add_prefix_space'] = True
-        self._tok = transformers.AutoTokenizer.from_pretrained(lm_name, **tokenizer_kwargs)
+        self._tok = transformers.AutoTokenizer.from_pretrained(
+            lm_name, **tokenizer_kwargs)
 
         if self._tok.pad_token is None:
             self._tok.pad_token = self._tok.eos_token
@@ -425,6 +426,7 @@ class PrismEncoder(nn.Module):
         return emb_tokens, att_tokens
 
     def cache(self, sentences, emb_tokens, att_tokens):
+        '''Cache sentence embeddings into a dict, using string hashes as keys.'''
         # detach, duplicate and move embeddings to CPU
         emb_tokens = emb_tokens.detach().clone().cpu()
 
@@ -449,10 +451,6 @@ def get_mean_embedding(token_embeddings):
 
 def get_last_embedding(token_embeddings):
     return token_embeddings[-1, :]
-
-#
-# Helper Functions
-#
 
 
 def load_pooling_function(identifier):

@@ -6,14 +6,16 @@ import os
 import json
 from collections import defaultdict
 import numpy as np
+import torch
+import torch.nn as nn
 
 # local imports
 from utils.setup import (setup_experiment, create_save_dir,
                          dir_name, setup_filter, analyze_filter, check_args)
 from utils.datasets import LabelledDataset
 from utils.training import classify_dataset
-from models.encoders import *
-from models.classifiers import *
+from models.encoders import PrismEncoder, load_pooling_function
+from models.classifiers import load_classifier
 
 
 def parse_arguments():
@@ -123,7 +125,7 @@ def main():
                 logging.warning(
                     f"[Warning] Validation data contains labels unseen in the training data.")
             label_types = sorted(set(train_data.get_label_types())
-                                 | set(valid_data.get_label_types()))  # list of labels
+                                 | set(valid_data.get_label_types()))
 
     # set up frequency filter
     frq_filter = setup_filter(args.filter, frq_init=args.frq_init,
@@ -170,8 +172,9 @@ def main():
         logging.info(f"Loaded pre-trained classifier from '{model_path}'.")
     classifier = classifier.to(torch.device(
         'cuda' if torch.cuda.is_available() else 'cpu'))
+
     # setup loss
-    # if it is regression loss but not normalized_relative
+    # if it is regression loss but not normalized_relative, we can calculate "acc" by rounding
     if args.loss_type == 'regression' and task_name != 'normalized_relative':
         criterion = loss_constructor(
             label_types, round_acc=True)  # type:ignore
@@ -189,21 +192,26 @@ def main():
         logging.info(
             f"Prediction completed with Acc: {np.mean(stats['accuracy']):.4f}, Loss: {np.mean(stats['loss']):.4f} (mean over batches).")
 
-        # convert label indices back to string labels
+        # save predicted labels/values to csv file
         if args.loss_type == 'classification':
             idx_lbl_map = {idx: lbl for idx, lbl in enumerate(label_types)}
 
+            # convert label indices back to string labels
             pred_labels = [
                 [idx_lbl_map[p] for p in preds]
                 for preds in stats['predictions']
             ]
-            pred_data = LabelledDataset(valid_data._inputs, pred_labels)
-            pred_path = os.path.join(
-                exp_path, f'{os.path.splitext(os.path.basename(args.valid_path))[0]}-pred.csv')
-            pred_data.save(pred_path)
+        else:
+            # simply save predicted float values for regression tasks
+            pred_labels = stats['predictions']
 
-            logging.info(
-                f"Saved results from {pred_data} to '{pred_path}'. Exiting.")
+        pred_data = LabelledDataset(valid_data._inputs, pred_labels)
+        pred_path = os.path.join(
+            exp_path, f'{os.path.splitext(os.path.basename(args.valid_path))[0]}-pred.csv')
+        pred_data.save(pred_path)
+
+        logging.info(
+            f"Saved results from {pred_data} to '{pred_path}'. Exiting.")
 
         exit()
 
