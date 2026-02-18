@@ -17,25 +17,17 @@ class PrismEncoder(nn.Module):
         transformers.logging.set_verbosity_error()
 
         self.max_length = max_length
-        if lm_name in ['gpt2', 'bigscience/bloom-560m', 'bigscience/bloom-1b1',
-                       'bigscience/bloom-1b7', 'bigscience/bloom-3b', 'bigscience/bloom-7b1']:
-            self._tok = transformers.AutoTokenizer.from_pretrained(
-                lm_name, use_fast=True, add_prefix_space=True)
-            self._tok.pad_token = self._tok.eos_token
-        else:
-            self._tok = transformers.AutoTokenizer.from_pretrained(
-                lm_name, use_fast=True)
+        tokenizer_kwargs = {'use_fast': True}
+        if any(m in lm_name for m in ['gpt2', 'bloom', 'Mistral', 'aya']):
+            tokenizer_kwargs['add_prefix_space'] = True
+        self._tok = transformers.AutoTokenizer.from_pretrained(lm_name, **tokenizer_kwargs)
 
-        if lm_name in ["mistralai/Ministral-3-3B-Base-2512"]:
-            # self._lm = Mistral3ForConditionalGeneration.from_pretrained(
-            # lm_name, return_dict=True, device_map="auto")
-            self._lm = transformers.AutoModel.from_pretrained(
-                lm_name, return_dict=True, torch_dtype=torch.float32, device_map="auto")
-            self._config = self._lm.config.text_config
-        else:
-            self._lm = transformers.AutoModel.from_pretrained(
-                lm_name, return_dict=True, torch_dtype=torch.float32, device_map="auto")
-            self._config = self._lm.config
+        if self._tok.pad_token is None:
+            self._tok.pad_token = self._tok.eos_token
+
+        self._lm = transformers.AutoModel.from_pretrained(
+            lm_name, return_dict=True, torch_dtype=torch.float32, device_map="auto")
+        self._config = self._lm.config
 
         self._emb_tuning = emb_tuning
         # load cache
@@ -226,9 +218,6 @@ class PrismEncoder(nn.Module):
             )
 
         # move input to GPU (if available)
-        # if torch.cuda.is_available():
-        #     tok_sentences = {k: v.to(torch.device('cuda'))
-        #                      for k, v in tok_sentences.items()}
         if torch.cuda.is_available():
             device = torch.device('cuda')
             for k, v in tok_sentences.items():

@@ -7,12 +7,14 @@ __pycache__/
 *.so
 # *.csv
 # *.conllu
-# results/
+results/
 archive/
 *.err
 *.out
 slurm.sh
 slurm/
+*.sh
+submit_jobs.py
 
 # Distribution / packaging
 .Python
