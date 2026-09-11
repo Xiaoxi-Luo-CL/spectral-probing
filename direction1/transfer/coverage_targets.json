@@ -1,0 +1,146 @@
+[
+  {
+    "path": "tasks/ud-syntax/coverage-relations/kmr-all-relations.csv",
+    "lang": "kmr",
+    "n_test": 100,
+    "tier": "200-1000"
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/hsb-all-relations.csv",
+    "lang": "hsb",
+    "n_test": 100,
+    "tier": "200-1000"
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/sah-all-relations.csv",
+    "lang": "sah",
+    "n_test": 100,
+    "tier": "200-1000"
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/bho-all-relations.csv",
+    "lang": "bho",
+    "n_test": 100,
+    "tier": "200-1000"
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/sq-all-relations.csv",
+    "lang": "sq",
+    "n_test": 100,
+    "tier": "200-1000"
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/br-all-relations.csv",
+    "lang": "br",
+    "n_test": 100,
+    "tier": "200-1000"
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/ml-all-relations.csv",
+    "lang": "ml",
+    "n_test": 100,
+    "tier": "200-1000"
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/mr-all-relations.csv",
+    "lang": "mr",
+    "n_test": 100,
+    "tier": "200-1000"
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/bm-all-relations.csv",
+    "lang": "bm",
+    "n_test": 200,
+    "tier": "1000-2000"
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/quc-all-relations.csv",
+    "lang": "quc",
+    "n_test": 200,
+    "tier": "1000-2000"
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/yue-all-relations.csv",
+    "lang": "yue",
+    "n_test": 200,
+    "tier": "1000-2000"
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/ab-all-relations.csv",
+    "lang": "ab",
+    "n_test": 200,
+    "tier": "1000-2000"
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/hu-all-relations.csv",
+    "lang": "hu",
+    "n_test": 200,
+    "tier": "1000-2000"
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/jv-all-relations.csv",
+    "lang": "jv",
+    "n_test": 200,
+    "tier": "1000-2000"
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/ta-all-relations.csv",
+    "lang": "ta",
+    "n_test": 200,
+    "tier": "1000-2000"
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/kk-all-relations.csv",
+    "lang": "kk",
+    "n_test": 200,
+    "tier": "1000-2000"
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/vi-all-relations.csv",
+    "lang": "vi",
+    "n_test": 500,
+    "tier": "high"
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/fr-all-relations.csv",
+    "lang": "fr",
+    "n_test": 500,
+    "tier": "high"
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/de-all-relations.csv",
+    "lang": "de",
+    "n_test": 500,
+    "tier": "high"
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/es-all-relations.csv",
+    "lang": "es",
+    "n_test": 500,
+    "tier": "high"
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/tr-all-relations.csv",
+    "lang": "tr",
+    "n_test": 500,
+    "tier": "high"
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/hi-all-relations.csv",
+    "lang": "hi",
+    "n_test": 500,
+    "tier": "high"
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/ko-all-relations.csv",
+    "lang": "ko",
+    "n_test": 500,
+    "tier": "high"
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/ja-all-relations.csv",
+    "lang": "ja",
+    "n_test": 500,
+    "tier": "high"
+  }
+]

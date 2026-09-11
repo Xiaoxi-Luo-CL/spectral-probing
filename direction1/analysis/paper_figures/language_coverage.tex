@@ -1,0 +1,79 @@
+% =============================================================
+% Language coverage paragraph + table for cross-lingual transfer
+% =============================================================
+
+% ---------- Paragraph ----------
+
+We select 24 target languages from Universal Dependencies v2.17
+\citep{nivre-etal-2020-universal} according to three criteria.
+First, we stratify by \textbf{resource level}: eight high-resource languages
+(${>}$5{,}000 annotated sentences) serve as upper-bound transfer targets,
+eight mid-resource languages (1{,}000--2{,}000 sentences) represent an
+intermediate regime, and eight low-resource languages (200--1{,}000 sentences)
+stress-test transfer to genuinely data-scarce settings.
+Second, we stratify by \textbf{multilingual model support}: within each resource
+tier, four languages are covered by mBERT and XLM-R and four are not,
+allowing us to separate the effect of pre-training coverage from that of
+spectral transfer.
+Third, we maximise \textbf{typological diversity}: the set spans ten language
+families (Indo-European, Turkic, Sino-Tibetan, Dravidian, Austronesian,
+Koreanic, Japonic, Uralic, Mande, and Mayan--Quichean), both Roman and
+non-Roman scripts, and a wide range of morphological and syntactic features
+including agglutination, ergativity, polysynthesis, tonal systems, and
+non-SVO word orders.
+Table~\ref{tab:languages} lists all 24 languages together with their
+UD treebank, resource tier, model support, and primary linguistic motivation.
+
+% ---------- Table ----------
+
+\begin{table*}[ht]
+\centering
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\caption{The 24 target languages used in cross-lingual transfer experiments,
+         drawn from Universal Dependencies v2.17.
+         \textbf{Resource tier} is determined by total annotated sentence count
+         in the treebank.
+         \textbf{Model support}: \textit{All} = covered by all four models;
+         \textit{mX} = mBERT and XLM-R only; \textit{--} = not covered
+         by standard multilingual encoders.}
+\label{tab:languages}
+\begin{tabular}{llllllp{6.2cm}}
+\toprule
+Code & Language & UD Treebank & Resource & Script & Model support & Linguistic significance \\
+\midrule
+\multicolumn{7}{l}{\textit{High resource ($>$5{,}000 sentences)}} \\
+\midrule
+de  & German        & UD\_German-GSD           & High & Roman     & All  & Germanic; complex case system and compound nouns. \\
+es  & Spanish       & UD\_Spanish-AnCora        & High & Roman     & All  & Romance; high-resource baseline for cross-lingual transfer. \\
+fr  & French        & UD\_French-GSD            & High & Roman     & All  & Romance; highly influential global benchmark. \\
+vi  & Vietnamese    & UD\_Vietnamese-VTB        & High & Roman     & All  & Austroasiatic; monosyllabic and tonal (unique in Roman script). \\
+tr  & Turkish       & UD\_Turkish-IMST          & High & Roman     & All  & Agglutinative Turkic baseline; highly regular morphology. \\
+hi  & Hindi         & UD\_Hindi-HDTB            & High & Non-Roman & All  & Indo-Aryan; uses Devanagari script; major global language. \\
+ko  & Korean        & UD\_Korean-Kaist          & High & Non-Roman & All  & Language isolate; Hangul script; unique SOV and agglutination. \\
+ja  & Japanese      & UD\_Japanese-GSD          & High & Non-Roman & All  & Japonic; complex three-script system (Kanji/Kana). \\
+\midrule
+\multicolumn{7}{l}{\textit{Mid resource (1{,}000--2{,}000 sentences)}} \\
+\midrule
+hu  & Hungarian     & UD\_Hungarian-Szeged      & 1000--2000 & Roman     & mX & Uralic agglutinative; complex case system. \\
+jv  & Javanese      & UD\_Javanese-CSUI         & 1000--2000 & Roman     & mX & Austronesian; features unique social registers. \\
+ta  & Tamil         & UD\_Tamil-TTB             & 1000--2000 & Non-Roman & mX & Classical Dravidian; heavy use of agglutination. \\
+kk  & Kazakh        & UD\_Kazakh-KTB            & 1000--2000 & Non-Roman & mX & Central Asian Turkic; highly regular agglutination. \\
+bm  & Bambara       & UD\_Bambara-CRB           & 1000--2000 & Roman     & -- & Mande (West Africa); tonal system. \\
+quc & K'iche'       & UD\_Kiche-IU              & 1000--2000 & Roman     & -- & Mayan; polysynthetic and ergative. \\
+yue & Cantonese     & UD\_Cantonese-HK          & 1000--2000 & Non-Roman & -- & Sino-Tibetan; tests LLM generalisation beyond Mandarin. \\
+ab  & Abkhaz        & UD\_Abkhaz-AbNC           & 1000--2000 & Non-Roman & -- & Caucasian; exceptionally large consonant inventory. \\
+\midrule
+\multicolumn{7}{l}{\textit{Low resource (200--1{,}000 sentences)}} \\
+\midrule
+sq  & Albanian      & UD\_Albanian-TSA          & 200--1000 & Roman     & mX & Independent IE branch; isolate-like within Europe. \\
+br  & Breton        & UD\_Breton-KEB            & 200--1000 & Roman     & mX & Celtic; distinct VSO word order. \\
+ml  & Malayalam     & UD\_Malayalam-UFAL        & 200--1000 & Non-Roman & mX & Dravidian; extreme morphological complexity. \\
+mr  & Marathi       & UD\_Marathi-UFAL          & 200--1000 & Non-Roman & mX & Indo-Aryan; complex three-gender system. \\
+kmr & N.\ Kurdish   & UD\_Northern\_Kurdish-Kurmanji & 200--1000 & Roman & -- & Features split ergativity, a rare alignment system. \\
+hsb & Upper Sorbian & UD\_Upper\_Sorbian-UFAL   & 200--1000 & Roman     & -- & Slavic; preserves the rare dual number. \\
+sah & Yakut         & UD\_Yakut-YKTDT           & 200--1000 & Non-Roman & -- & Turkic (Cyrillic); strict vowel harmony. \\
+bho & Bhojpuri      & UD\_Bhojpuri-BHTB         & 200--1000 & Non-Roman & -- & Indo-Aryan; high-population ``minority'' language. \\
+\bottomrule
+\end{tabular}
+\end{table*}

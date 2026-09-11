@@ -1,0 +1,35 @@
+model             lang   task          pool     nofilter  auto(512)    delta  ok?
+---------------------------------------------------------------------------------
+aya-expanse-8b    en     pos           None       0.8959     0.9164  +0.0205  ✓
+aya-expanse-8b    en     relations     None       0.7324     0.7534  +0.0211  ✓
+aya-expanse-8b    tr     pos           None       0.7608     0.8180  +0.0571  ✓
+aya-expanse-8b    tr     relations     None       0.5098     0.6130  +0.1032  ✓
+aya-expanse-8b    vi     pos           None       0.7799     0.7916  +0.0118  ✓
+aya-expanse-8b    vi     relations     None       0.4936     0.5013  +0.0078  ✓
+aya-expanse-8b    zh     pos           None       0.7395     0.7868  +0.0472  ✓
+aya-expanse-8b    zh     relations     None       0.5509     0.5667  +0.0157  ✓
+xlm-roberta-base  en     pos           None       0.9443     0.9442  -0.0001  ✗
+xlm-roberta-base  en     relations     None       0.8186     0.8214  +0.0028  ✓
+xlm-roberta-base  tr     pos           None       0.8697     0.8728  +0.0030  ✓
+xlm-roberta-base  tr     pos           last       0.8995     0.8997  +0.0002  ✓
+xlm-roberta-base  tr     relations     None       0.7369     0.7482  +0.0113  ✓
+xlm-roberta-base  vi     pos           None       0.8274     0.8252  -0.0022  ✗
+xlm-roberta-base  vi     relations     None       0.5784     0.5762  -0.0022  ✗
+xlm-roberta-base  zh     pos           None       0.8641     0.8833  +0.0192  ✓
+xlm-roberta-base  zh     relations     None       0.6867     0.7108  +0.0241  ✓
+Qwen2.5-7B        en     pos           last       0.9191     0.9284  +0.0093  ✓
+Qwen2.5-7B        en     relations     None       0.6950     0.7207  +0.0257  ✓
+Qwen2.5-7B        tr     pos           None       0.6787     0.7459  +0.0672  ✓
+Qwen2.5-7B        tr     pos           last       0.8393     0.8464  +0.0071  ✓
+Qwen2.5-7B        tr     relations     None       0.4034     0.5341  +0.1307  ✓
+Qwen2.5-7B        tr     relations     last       0.6345     0.6928  +0.0582  ✓
+Qwen2.5-7B        vi     pos           None       0.7135     0.7287  +0.0152  ✓
+Qwen2.5-7B        vi     pos           last       0.8390     0.8431  +0.0041  ✓
+Qwen2.5-7B        vi     relations     None       0.4486     0.4665  +0.0179  ✓
+Qwen2.5-7B        vi     relations     last       0.5867     0.5970  +0.0103  ✓
+Qwen2.5-7B        zh     relations     None       0.6376     0.6464  +0.0088  ✓
+Qwen2.5-7B        zh     relations     last       0.7002     0.7122  +0.0120  ✓
+---------------------------------------------------------------------------------
+
+Pairs: 29  |  Improved: 26/29  |  Mean delta: +0.0244
+Mean delta (improved only): +0.0274

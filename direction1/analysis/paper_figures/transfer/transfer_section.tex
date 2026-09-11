@@ -1,0 +1,166 @@
+\subsection{Data Collection}
+
+We select 24 target languages from Universal Dependencies v2.17
+\citep{UD} according to three criteria.
+First, we stratify by \textbf{resource level}: eight high-resource
+languages ({$>$}5{,}000 annotated sentences) serve as upper-bound
+transfer targets, eight mid-resource languages (1{,}000--2{,}000
+sentences) represent an intermediate regime, and eight low-resource
+languages (200--1{,}000 sentences) stress-test transfer to genuinely
+data-scarce settings.
+Second, we stratify by \textbf{multilingual model support}: within
+each resource tier, four languages are covered by mBERT and XLM-R
+and four are not, allowing us to separate the effect of pre-training
+coverage from that of spectral transfer.
+Third, we maximise \textbf{typological diversity}: the set spans ten
+language families (Indo-European, Turkic, Sino-Tibetan, Dravidian,
+Austronesian, Koreanic, Japonic, Uralic, Mande, and Mayan--Quichean),
+both Latin and non-Latin scripts, and a wide range of morphological
+and syntactic features including agglutination, ergativity,
+polysynthesis, tonal systems, and non-SVO word orders.
+Table~\ref{tab:languages} lists all 24 languages with their UD
+treebank, resource tier, model support, and primary typological
+motivation.
+
+% -----------------------------------------------------------------
+\subsection{Experimental Settings}
+
+We evaluate on two word-level tasks: Universal POS tagging
+(\textbf{POS}) and dependency head-relation classification
+(\textbf{Relations}), both using word-pooled token representations
+($\mathtt{pool\_word\_embed{=}avg}$).
+Four models are tested: the encoder-only models mBERT
+\citep{devlin-etal-2019-bert} and XLM-R \citep{conneau-etal-2020-unsupervised},
+and the decoder-only models Aya-Expanse-8B
+\citep{aryabumi-etal-2024-aya} and Mistral-7B \citep{jiang2023mistral}.
+English is the primary source language; Chinese is used as a secondary
+source for low-resource Cantonese targets.
+All results are averaged over three random seeds.
+
+For each source--target pair we evaluate eight conditions,
+grouped by the amount of target-language data used:
+
+\paragraph{Zero-shot (no target data).}
+\begin{itemize}
+  \item[\textbf{(1)}] \textbf{Spectral transfer.}
+        Apply the source spectral filter $P(A)$ and linear probe
+        $W(A)$ directly to word-pooled representations of the target
+        language~$B$; no fine-tuning.
+  \item[\textbf{(2)}] \textbf{No-filter baseline.}
+        Apply $W(A)$ to raw (unfiltered) word-pooled representations
+        of $B$; no spectral filter, no fine-tuning.
+\end{itemize}
+
+\paragraph{Few-shot with a fresh spectral filter.}
+\begin{itemize}
+  \item[\textbf{(3a)}] \textbf{Scratch $P$+$W$.}
+        Initialise both the spectral filter and the probe randomly;
+        train both from scratch on $n$ target-language examples.
+  \item[\textbf{(3b)}] \textbf{Fine-tune $P(A)$+$W(A)$.}
+        Warm-start both $P$ and $W$ from the source experiment;
+        fine-tune both on $n$ target-language examples.
+\end{itemize}
+
+\paragraph{Few-shot with a frozen source filter.}
+\begin{itemize}
+  \item[\textbf{(4a)}] \textbf{Frozen $P(A)$ + Scratch $W$.}
+        Fix the source filter $P(A)$; train a fresh probe $W$
+        from scratch on $n$ examples.  This directly tests whether
+        $P(A)$ provides a useful inductive bias for the probe.
+  \item[\textbf{(4b)}] \textbf{Frozen $P(A)$ + Fine-tune $W(A)$.}
+        Fix $P(A)$; warm-start $W$ from $W(A)$ and fine-tune on
+        $n$ examples.
+\end{itemize}
+
+\paragraph{Few-shot without a spectral filter (ablations).}
+\begin{itemize}
+  \item[\textbf{(5a)}] \textbf{Scratch $W$ (no filter).}
+        No spectral filter; train $W$ from scratch on $n$ examples.
+  \item[\textbf{(5b)}] \textbf{Fine-tune $W(A)$ (no filter).}
+        No spectral filter; warm-start $W$ from $W(A)$ and
+        fine-tune on $n$ examples.
+\end{itemize}
+
+\noindent Conditions (3a)--(5b) are run at
+$n \in \{50, 100, 500, 1{,}000\}$.
+The key comparisons are:
+(1) vs.\ (2) isolates the zero-shot value of the spectral filter;
+(4a) vs.\ (3a) isolates its few-shot value when $W$ is trained from
+scratch;
+(4b) vs.\ (5b) isolates its value when $W$ is warm-started;
+and (3b) vs.\ (4a) tests whether fine-tuning $P$ further improves
+over freezing it.
+
+% -----------------------------------------------------------------
+\subsection{Main Results}
+
+Figure~\ref{fig:heatmap_xlmr} shows results for XLM-R with English
+as the source on the Relations task; trends for POS and for
+decoder-only models are discussed below.
+
+\paragraph{Zero-shot transfer.}
+For encoder-only models, condition~(1) mildly but consistently
+outperforms the unfiltered baseline~(2): with mBERT and Chinese as
+the source, the margin is 2--3 points on high-resource targets
+(e.g., 43.5 vs.\ 40.7 on German, 39.6 vs.\ 36.7 on Hindi).
+Both conditions are far below the few-shot upper bound, confirming
+that zero-shot transfer is limited by representation mismatch rather
+than by spectral filter quality.
+For decoder-only models (Qwen; see also Aya in
+Figure~\ref{fig:heatmap_aya}), both~(1) and~(2) collapse to near-random
+accuracy (6--21\%), reflecting the greater language-specificity of
+decoder spectral profiles established in~§\ref{sec:motivation}.
+
+\paragraph{Frozen source filter as a few-shot inductive bias.}
+The primary empirical finding is the large advantage of condition~(4a)
+---frozen $P(A)$, fresh $W$ trained from scratch---over all competing
+conditions at small $n$ for encoder-only models.
+At $n{=}50$, freezing the Chinese spectral filter gains roughly 15--20
+accuracy points over training $P$ and $W$ from scratch~(3a): German
+59.4 vs.\ 39.2, French 60.6 vs.\ 43.5, Hindi 54.0 vs.\ 34.0, Korean
+47.7 vs.\ 30.9 (all mBERT, Table~\ref{tab:transfer_compact}).
+The gap against the no-filter analogue~(5a) is nearly as large
+(e.g., German 59.4 vs.\ 41.7 at $n{=}50$), establishing that the
+gain stems from the spectral prior itself, not merely from parameter
+warm-starting.
+The advantage persists at $n{=}500$, where~(4a) still leads~(3a) by
+7--9 points (German 78.3 vs.\ 71.0, French 79.4 vs.\ 71.0, Hindi
+75.9 vs.\ 67.3), indicating that the Chinese spectral profile remains
+a useful constraint even when substantial target-language data are
+available.
+The same pattern holds for mid-resource targets covered by the model's
+pre-training (Breton: 56.3 vs.\ 41.9 at $n{=}50$) and for those that
+are not (Upper Sorbian: 48.3 vs.\ 38.3), showing that the benefit
+of $P(A)$ is not contingent on pre-training coverage.
+
+\paragraph{Freezing $P(A)$ beats fine-tuning it.}
+A surprising finding is that freezing the source filter outperforms
+fine-tuning it.
+Condition~(4a) (frozen $P(A)$, scratch $W$) uniformly exceeds
+condition~(3b) (both $P(A)$ and $W(A)$ fine-tuned) across all $n$:
+on German, 59.4 vs.\ 56.6 at $n{=}50$ and 78.3 vs.\ 72.5 at
+$n{=}500$; on French, 60.6 vs.\ 53.6 and 79.4 vs.\ 73.2.
+This suggests that the source spectral filter encodes task-relevant
+frequency structure that is best preserved by freezing, and that
+fine-tuning on limited target data corrupts this structure.
+Condition~(4b)---frozen $P(A)$, fine-tuned $W(A)$---is
+competitive with~(4a) at $n{=}500$ but lags at small $n$, implying
+that warm-starting $W$ from the source probe introduces source-language
+biases that are only overcome once sufficient target data are available.
+
+\paragraph{Decoder models: few-shot recovery without spectral benefit.}
+For Qwen, the few-shot conditions (3a)--(5b) recover strongly from
+the near-random zero-shot baseline: all conditions reach 57--75\%
+at $n{=}500$ on high-resource targets, comparable to mBERT.
+However, none of the conditions that use $P(A)$ systematically
+outperform their filter-free counterparts.
+At $n{=}50$, frozen $P(A)$ actually \emph{hurts} Qwen: condition~(4a)
+falls below~(3a) on French (56.4 vs.\ 61.0) and Korean (52.9
+vs.\ 60.0), the opposite of the encoder pattern.
+At $n{=}500$, all conditions collapse to within ${\sim}1$\,pp of
+each other (e.g., German: 72.3--73.0), suggesting that with enough
+data the learned filter converges regardless of initialisation.
+These results are consistent with the view that decoder spectral
+profiles are more language-specific (§\ref{sec:motivation}): the
+Chinese $P(A)$ is not a reliable prior for the target task
+distribution in decoder models.

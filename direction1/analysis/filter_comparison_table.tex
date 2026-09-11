@@ -1,0 +1,49 @@
+\begin{table}[h]
+\centering
+\small
+\caption{Probing accuracy without and with the learned spectral filter (auto-tuned, 512 components).
+         The best accuracy in each row is \textbf{bolded}.
+         Pool refers to word-level token pooling: \textit{none} = no aggregation (sub-word),
+         \textit{last} = last-token pooling.}
+\label{tab:filter_comparison}
+\begin{tabular}{llllccr}
+\toprule
+Model & Lang & Task & Pool & No Filter & +\,Filter & $\Delta$ \\
+\midrule
+\multirow{8}{*}{aya-expanse-8b}
+  & en & POS  & none & 0.8959 & \textbf{0.9164} & $+$0.0205 \\
+  & en & Rel.  & none & 0.7324 & \textbf{0.7534} & $+$0.0211 \\
+  & tr & POS  & none & 0.7608 & \textbf{0.8180} & $+$0.0571 \\
+  & tr & Rel.  & none & 0.5098 & \textbf{0.6130} & $+$0.1032 \\
+  & vi & POS  & none & 0.7799 & \textbf{0.7916} & $+$0.0118 \\
+  & vi & Rel.  & none & 0.4936 & \textbf{0.5013} & $+$0.0078 \\
+  & zh & POS  & none & 0.7395 & \textbf{0.7868} & $+$0.0472 \\
+  & zh & Rel.  & none & 0.5509 & \textbf{0.5667} & $+$0.0157 \\
+\midrule
+\multirow{9}{*}{XLM-R-base}
+  & en & POS  & none & \textbf{0.9443} & 0.9442          & $-$0.0001 \\
+  & en & Rel.  & none & 0.8186          & \textbf{0.8214} & $+$0.0028 \\
+  & tr & POS  & none & 0.8697          & \textbf{0.8728} & $+$0.0030 \\
+  & tr & POS  & last & 0.8995          & \textbf{0.8997} & $+$0.0002 \\
+  & tr & Rel.  & none & 0.7369          & \textbf{0.7482} & $+$0.0113 \\
+  & vi & POS  & none & \textbf{0.8274} & 0.8252          & $-$0.0022 \\
+  & vi & Rel.  & none & \textbf{0.5784} & 0.5762          & $-$0.0022 \\
+  & zh & POS  & none & 0.8641          & \textbf{0.8833} & $+$0.0192 \\
+  & zh & Rel.  & none & 0.6867          & \textbf{0.7108} & $+$0.0241 \\
+\midrule
+\multirow{12}{*}{Qwen2.5-7B}
+  & en & POS  & last & 0.9191 & \textbf{0.9284} & $+$0.0093 \\
+  & en & Rel.  & none & 0.6950 & \textbf{0.7207} & $+$0.0257 \\
+  & tr & POS  & none & 0.6787 & \textbf{0.7459} & $+$0.0672 \\
+  & tr & POS  & last & 0.8393 & \textbf{0.8464} & $+$0.0071 \\
+  & tr & Rel.  & none & 0.4034 & \textbf{0.5341} & $+$0.1307 \\
+  & tr & Rel.  & last & 0.6345 & \textbf{0.6928} & $+$0.0582 \\
+  & vi & POS  & none & 0.7135 & \textbf{0.7287} & $+$0.0152 \\
+  & vi & POS  & last & 0.8390 & \textbf{0.8431} & $+$0.0041 \\
+  & vi & Rel.  & none & 0.4486 & \textbf{0.4665} & $+$0.0179 \\
+  & vi & Rel.  & last & 0.5867 & \textbf{0.5970} & $+$0.0103 \\
+  & zh & Rel.  & none & 0.6376 & \textbf{0.6464} & $+$0.0088 \\
+  & zh & Rel.  & last & 0.7002 & \textbf{0.7122} & $+$0.0120 \\
+\bottomrule
+\end{tabular}
+\end{table}

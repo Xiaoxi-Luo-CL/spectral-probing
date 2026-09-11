@@ -5,12 +5,13 @@ import logging
 import os
 import json
 from collections import defaultdict
+from typing import Union
 import numpy as np
 import torch
 import torch.nn as nn
 
 # local imports
-from utils.setup import (setup_experiment, create_save_dir,
+from utils.setup import (setup_experiment, create_save_dir, skip_experiment,
                          dir_name, setup_filter, analyze_filter, check_args)
 from utils.datasets import LabelledDataset
 from utils.training import classify_dataset
@@ -43,6 +44,9 @@ def parse_arguments():
         '-ep', '--embedding_pooling', choices=['mean', 'last'], help='embedding pooling strategy (default: None)')
     arg_parser.add_argument(
         '-layer', '--embed_layer', type=int, default=None, help='layer for extracting embeddings (default: last layer)')
+    arg_parser.add_argument(
+        '--pool_word_embed', type=str, default=None, choices=['avg', 'last', None],
+        help='This parameter is about whether to pool tokens belonging to the same word into a single embedding. avg: average across all tokens. last: choose the last token, None: no pooling')
 
     # classifier setup
     arg_parser.add_argument('--classifier', choices=['linear', 'mlp'], default='linear',
@@ -85,6 +89,12 @@ def main():
     args = parse_arguments()
     check_args(args)
     suffix, task_name, lan = dir_name(args)
+
+    # is_done, path = skip_experiment(args.lm_name, args.train_path)
+    # if is_done:
+    #     print(
+    #         f"Skipping: Experiment for {args.lm_name} on {args.train_path} already exists at {path}")
+    #     exit(0)
 
     if not args.prediction:
         exp_path = create_save_dir('results', suffix)
@@ -141,7 +151,8 @@ def main():
     encoder = PrismEncoder(
         lm_name=args.lm_name, frq_filter=frq_filter, frq_tuning=frq_tuning,
         emb_tuning=args.embedding_tuning, emb_pooling=pooling_strategy,
-        cache=({} if args.embedding_caching else None), embed_layer=args.embed_layer)
+        cache=({} if args.embedding_caching else None), embed_layer=args.embed_layer,
+        pool_word_embed=args.pool_word_embed)
     logging.info(f"Constructed {encoder}.")
 
     if args.prediction:
@@ -278,6 +289,7 @@ def main():
         config = vars(args)
         config['task_name'] = task_name
         config['language'] = lan
+        config['accuracy'] = stats['accuracy'][-1]
         with open(config_path, 'w') as f:
             json.dump(config, f, indent=4)
 

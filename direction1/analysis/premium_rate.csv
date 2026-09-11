@@ -1,0 +1,7 @@
+,de,en,es,fr,ja,zh
+bert-base-multilingual-cased,1.502,1.0,1.921,1.863,0.984,0.593
+FacebookAI/xlm-roberta-base,1.54,1.0,1.966,1.964,1.381,0.445
+bigscience/bloom-560m,2.087,1.0,1.929,1.814,1.466,0.437
+bigscience/bloom-7b1,2.087,1.0,1.929,1.814,1.466,0.437
+CohereForAI/aya-expanse-8b,1.631,1.0,1.98,1.932,1.213,0.483
+mistralai/Mistral-7B-v0.1,1.983,1.0,2.468,2.295,1.886,0.804

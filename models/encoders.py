@@ -5,13 +5,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import transformers
+from typing import Tuple
 
 
 class PrismEncoder(nn.Module):
     def __init__(
             self, lm_name, frq_filter, frq_tuning=False,
             emb_tuning=False, emb_pooling=None, specials=False,
-            cache=None, embed_layer=None, max_length=512):
+            cache=None, embed_layer=None, max_length=512, pool_word_embed=None):
         super().__init__()
         # load transformer
         transformers.logging.set_verbosity_error()
@@ -46,6 +47,8 @@ class PrismEncoder(nn.Module):
         # public variables
         self.emb_dim = self._config.hidden_size
         self.num_layers = self._config.num_hidden_layers
+
+        self.pool_word_embed = pool_word_embed
 
     def __repr__(self):
         return \
@@ -93,6 +96,36 @@ class PrismEncoder(nn.Module):
         encoder._lm = objects.get('language_model', encoder._lm)
         return encoder
 
+    @classmethod
+    def from_lm(cls, lm, tok, lm_name, frq_filter, frq_tuning,
+                pool_word_embed, cache=None, max_length=512):
+        """
+        Construct a PrismEncoder reusing a pre-loaded LM and tokenizer.
+        Avoids the expensive AutoModel.from_pretrained() call.
+        Useful for batch inference where multiple filter/probe configurations
+        share the same backbone.
+        """
+        encoder = cls.__new__(cls)
+        nn.Module.__init__(encoder)
+        encoder.max_length = max_length
+        encoder._tok = tok
+        encoder._lm = lm
+        encoder._config = lm.config
+        encoder._emb_tuning = False
+        encoder._cache = cache
+        encoder._embed_layer = None
+        encoder._lm_name = lm_name
+        encoder._specials = False
+        encoder._emb_pooling = None
+        encoder._frq_tuning = frq_tuning
+        encoder._frq_filter = (
+            None if frq_filter is None else nn.Parameter(frq_filter)
+        )
+        encoder.emb_dim = lm.config.hidden_size
+        encoder.num_layers = lm.config.num_hidden_layers
+        encoder.pool_word_embed = pool_word_embed
+        return encoder
+
     def train(self, mode=True):
         super().train(mode)
         # disable LM training (incl. dropout)
@@ -136,6 +169,46 @@ class PrismEncoder(nn.Module):
 
         return emb_tokens, att_tokens
 
+    def _pool_subwords_to_words(self, hidden_states, attention, tok_sentences) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Pools subword embeddings to word-level embeddings.
+
+        Args:
+            hidden_states (torch.Tensor): Token embeddings of shape (batch_size, seq_len, emb_dim).
+            attention (torch.Tensor): Attention mask of shape (batch_size, seq_len).
+            tok_sentences: Tokenized sentences from the tokenizer, supporting word_ids().
+
+        Returns:
+            Tuple[torch.Tensor, torch.Tensor]: 
+                - Pooled word embeddings (batch_size, max_words, emb_dim).
+                - Pooled attention masks (batch_size, max_words).
+        """
+        pooled_embeddings, pooled_attentions = [], []
+        for sidx in range(hidden_states.shape[0]):
+            sentence_pooled_embedding, sentence_pooled_attn = [], []
+            word_ids = tok_sentences.word_ids(batch_index=sidx) + [None]
+            previous_word = None
+            start_id = -1
+            # append None to word_ids to ensure the last word is pooled at the end of the sequence
+            for tidx, word in enumerate(word_ids):
+                if word != previous_word:
+                    if previous_word is not None:  # start of a new word
+                        if self.pool_word_embed == 'avg':
+                            sentence_pooled_embedding.append(
+                                torch.mean(hidden_states[sidx, start_id:tidx, :], dim=0))
+                        elif self.pool_word_embed == 'last':
+                            sentence_pooled_embedding.append(hidden_states[sidx, tidx-1, :])
+                        sentence_pooled_attn.append(attention[sidx,tidx-1])
+                    previous_word = word
+                    start_id = tidx
+                else:
+                    continue
+            pooled_embeddings.append(torch.stack(sentence_pooled_embedding))
+            pooled_attentions.append(torch.stack(sentence_pooled_attn))
+        # stack pooled embeddings and attentions into tensors while padding to maximum sentence length
+        return nn.utils.rnn.pad_sequence(pooled_embeddings, batch_first=True), \
+            nn.utils.rnn.pad_sequence(pooled_attentions, batch_first=True)
+
     def embed(self, sentences, label_type):
         # try retrieving embeddings from cache
         emb_cache = self.retrieve(sentences)
@@ -157,39 +230,44 @@ class PrismEncoder(nn.Module):
 
         # perform embedding forward pass
         model_outputs = self._lm(**model_inputs, output_hidden_states=True)
-        # (batch_size, max_len, hidden_dim)
+        # take the final layer's embedding: (batch_size, max_len, hidden_dim)
         if self._embed_layer is not None:
             hidden_states = model_outputs.hidden_states[self._embed_layer]
         else:
             hidden_states = model_outputs.hidden_states[-1]
-        emb_tokens, att_tokens = hidden_states, tok_sentences['attention_mask'].bool(
-        )
-
-        # remove special tokens
-        if (not self._specials) and (self._emb_pooling is None):
-            # mask any non-padding token that is special
-            non_special_mask = ~tok_sentences['special_tokens_mask'].bool(
-            ) & att_tokens  # (batch_size, max_len)
-            # new maximum length without special tokens
-            non_special_max_len = torch.max(torch.sum(non_special_mask, -1))
-            non_special_embeddings = torch.zeros_like(
-                # (batch_size, new_max_len, hidden_dim)
-                emb_tokens)[:, :non_special_max_len, :]
-            non_special_attentions = torch.zeros_like(
-                # (batch_size, new_max_len)
-                att_tokens)[:, :non_special_max_len]
-            # iterate over each sequence due to variable length
-            for sidx in range(emb_tokens.shape[0]):
-                # current sequence length up to which values should be filled
-                seq_len = torch.sum(non_special_mask[sidx])
-                # store non-special token embeddings up to new sequence length (rest is zeros)
-                non_special_embeddings[sidx,
-                                       :seq_len] = emb_tokens[sidx, non_special_mask[sidx], :]
-                non_special_attentions[sidx,
-                                       :seq_len] = att_tokens[sidx, non_special_mask[sidx]]
-            # keep non-special embeddings only
-            emb_tokens = non_special_embeddings
-            att_tokens = non_special_attentions
+            
+        # pooling embedding
+        if self.pool_word_embed is None:
+            emb_tokens, att_tokens = hidden_states, tok_sentences['attention_mask'].bool(
+            )
+            # remove special tokens
+            if (not self._specials) and (self._emb_pooling is None):
+                # mask any non-padding token that is special
+                non_special_mask = ~tok_sentences['special_tokens_mask'].bool(
+                ) & att_tokens  # (batch_size, max_len)
+                # new maximum length without special tokens
+                non_special_max_len = torch.max(torch.sum(non_special_mask, -1))
+                non_special_embeddings = torch.zeros_like(
+                    # (batch_size, new_max_len, hidden_dim)
+                    emb_tokens)[:, :non_special_max_len, :]
+                non_special_attentions = torch.zeros_like(
+                    # (batch_size, new_max_len)
+                    att_tokens)[:, :non_special_max_len]
+                # iterate over each sequence due to variable length
+                for sidx in range(emb_tokens.shape[0]):
+                    # current sequence length up to which values should be filled
+                    seq_len = torch.sum(non_special_mask[sidx])
+                    # store non-special token embeddings up to new sequence length (rest is zeros)
+                    non_special_embeddings[sidx,
+                                        :seq_len] = emb_tokens[sidx, non_special_mask[sidx], :]
+                    non_special_attentions[sidx,
+                                        :seq_len] = att_tokens[sidx, non_special_mask[sidx]]
+                # keep non-special embeddings only
+                emb_tokens = non_special_embeddings
+                att_tokens = non_special_attentions
+        else:
+            emb_tokens, att_tokens = self._pool_subwords_to_words(
+                hidden_states, tok_sentences['attention_mask'].bool(), tok_sentences)
 
         # store embeddings in cache (if cache is enabled)
         if self._cache is not None:

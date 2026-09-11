@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Phase 1a: Spectral Alignment — mBERT, XLM-R, LaBSE</title>
+  <link href="https://fonts.googleapis.com/css2?family=Source+Sans+Pro:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:#f5fbf7; --card:#fff; --text:#225573; --text-light:#4a7a94;
+      --accent:#b6274e; --green:#547b5b; --green-light:#6d8436;
+      --border:#d5e3ec; --border-light:#e8f0f5; --tag-bg:#eef5f0;
+      --shadow:0 1px 3px rgba(34,85,115,.08),0 4px 14px rgba(34,85,115,.05);
+      --shadow-lg:0 2px 6px rgba(34,85,115,.10),0 8px 24px rgba(34,85,115,.08);
+      --radius:10px; --max-w:1440px;
+    }
+    *{box-sizing:border-box} html,body{margin:0;padding:0}
+    body{font-family:'Source Sans Pro',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+         background:var(--bg);color:var(--text);line-height:1.55;font-size:15px}
+    .page{max-width:var(--max-w);margin:0 auto;padding:32px 48px 64px}
+    .header{background:linear-gradient(135deg,#225573 0%,#1a6e5c 50%,#547b5b 100%);
+            color:#fff;padding:48px 56px;border-radius:var(--radius);
+            margin-bottom:32px;box-shadow:var(--shadow-lg)}
+    .header h1{margin:0 0 10px;font-size:2rem;font-weight:700;letter-spacing:-.02em}
+    .header .meta{font-size:.92rem;opacity:.82}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);
+          padding:28px 32px;margin-bottom:24px;box-shadow:var(--shadow)}
+    .card h2{margin:0 0 14px;font-size:1.3rem;font-weight:700;display:flex;align-items:center;gap:10px}
+    .card h2 .num{display:inline-flex;align-items:center;justify-content:center;
+                  width:28px;height:28px;background:var(--accent);color:#fff;
+                  font-size:.8rem;font-weight:700;border-radius:50%}
+    .card h3{font-size:1.05rem;font-weight:600;margin:18px 0 8px;color:var(--text)}
+    .summary{background:linear-gradient(135deg,#eef5f0,#e8f3f9);
+             border-left:4px solid var(--green);padding:20px 24px;
+             border-radius:0 var(--radius) var(--radius) 0;margin:16px 0 20px}
+    .warning{background:#fef8ee;border-left:4px solid #d4880f;
+             padding:20px 24px;border-radius:0 var(--radius) var(--radius) 0;margin:16px 0 20px}
+    .caveat{background:#f3f6f9;border-left:4px solid var(--text-light);
+            padding:16px 20px;border-radius:0 var(--radius) var(--radius) 0;margin:16px 0 20px;
+            font-size:.9rem;color:var(--text-light)}
+    table{width:100%;border-collapse:separate;border-spacing:0;margin:14px 0;
+          font-size:.88rem;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+    th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--border-light)}
+    th{background:#f0f6f2;font-weight:600;text-transform:uppercase;
+       letter-spacing:.04em;font-size:.82rem;color:var(--text-light)}
+    tr:last-child td{border-bottom:none} tr:hover td{background:#f8fcfa}
+    td.best{color:var(--accent);font-weight:700}
+    td.warn{color:#a56a0b;font-weight:600}
+    td.num,th.num-col{text-align:right;font-variant-numeric:tabular-nums}
+    pre{background:#1e2d3a;color:#c8dce6;padding:18px 22px;border-radius:8px;
+        font-size:.82rem;line-height:1.55;overflow-x:auto;margin:14px 0}
+    code{background:var(--tag-bg);padding:2px 7px;border-radius:4px;
+         font-size:.84em;color:var(--green);font-family:'SF Mono',Menlo,Consolas,monospace}
+    pre code{background:transparent;color:inherit;padding:0;font-size:inherit}
+    a{color:var(--green);text-decoration:none;font-weight:600}
+    a:hover{color:var(--accent);text-decoration:underline}
+    img{max-width:100%;border:1px solid var(--border);border-radius:8px;
+        margin:1em 0;box-shadow:var(--shadow)}
+    .mtag{display:inline-block;padding:2px 10px;border-radius:999px;font-size:.78rem;
+          font-weight:600;letter-spacing:.02em;background:var(--tag-bg);color:var(--green);margin-right:4px}
+    .mtag.rose{background:#fae6ec;color:var(--accent)}
+    .mtag.teal{background:#e2edf3;color:var(--text)}
+    .mtag.amber{background:#fdf1dc;color:#a56a0b}
+    .mtag.olive{background:#eef2e1;color:var(--green-light)}
+    .mtag.gray{background:#e8eef2;color:var(--text-light)}
+    ul,ol{margin:8px 0 8px 20px;padding:0} li{margin:4px 0} p{margin:8px 0}
+    .two-col{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+    @media(max-width:900px){.two-col{grid-template-columns:1fr}}
+    .fig-caption{font-size:.83rem;color:var(--text-light);margin-top:-6px;margin-bottom:12px}
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <div class="header">
+    <h1>Phase 1a: Spectral Alignment Profiles — mBERT, XLM-R, LaBSE</h1>
+    <div class="meta">
+      Direction 2 &mdash; DCT frequency decomposition of cross-lingual representations &bull;
+      NTREX-128 pilot (326 blocks &times; 6 languages) &bull; 2026-09-11
+    </div>
+  </div>
+
+  <!-- 1. Key Findings -->
+  <div class="card">
+    <h2><span class="num">1</span> Key Findings</h2>
+    <div class="summary">
+      <ul>
+        <li>
+          <strong>DC = mean-pool baseline; Low band beats it at middle layers.</strong>
+          The DCT DC coefficient equals &radic;n &middot; mean(H), so band_adv[DC] is exactly
+          the translation advantage of standard mean-pool embeddings. In mBERT, Low-band P@1 = 0.798
+          at L8 vs DC P@1 = 0.741 at L8 — a +5.7pp lead. Against the conventional L12 mean-pool baseline
+          (P@1 = 0.477), Low at L8 outperforms by <strong>+32pp</strong> (67% relative) with no fine-tuning.
+        </li>
+        <li>
+          <strong>mBERT L12: alignment concentrates in DC at the final layer.</strong>
+          DC band_adv jumps +225% from L10&rarr;L12 (0.031 &rarr; 0.100) while Low drops &minus;35%.
+          The last transformer block is associated with a shift of alignment structure toward the mean-pooling direction.
+        </li>
+        <li>
+          <strong>XLM-R anisotropy signature: DC band_energy = 97%, DC band_adv &asymp; 0.</strong>
+          XLM-R's final layer concentrates 97% of band energy into DC, yet DC band_adv &asymp; 0.001 —
+          all blocks share the same mean direction so mean-pool carries zero differential alignment signal.
+          The Low band (0.2% of energy) is XLM-R's primary alignment axis (band_adv=0.030, P@1=0.408 &gt; DC 0.388).
+        </li>
+        <li>
+          <strong>LaBSE shows the strongest DC alignment (band_adv=0.280),
+          with near-perfect P@1 across all bands.</strong>
+          Even VeryHigh band achieves P@1=0.924 at L12, consistent with alignment signal being
+          distributed across the entire representation. This observation complicates the Phase 1b
+          hypothesis that mean-pool training specifically targets DC, since LaBSE uses CLS-pool.
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 2. Setup -->
+  <div class="card">
+    <h2><span class="num">2</span> Setup</h2>
+    <table>
+      <thead><tr><th>Model</th><th>Training objective</th><th>Pool used</th><th>DC band_adv (L12)</th><th class="num-col">Best P@1 (any band/layer)</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><span class="mtag teal">mBERT</span></td>
+          <td>MLM (no alignment)</td>
+          <td>— (baseline)</td>
+          <td class="num">0.100</td>
+          <td class="num best">0.798 (Low, L8)</td>
+        </tr>
+        <tr>
+          <td><span class="mtag olive">XLM-R</span></td>
+          <td>MLM on larger multilingual corpus</td>
+          <td>— (baseline)</td>
+          <td class="num warn">0.001</td>
+          <td class="num">0.722 (DC, L6)</td>
+        </tr>
+        <tr>
+          <td><span class="mtag rose">LaBSE</span></td>
+          <td>CLS-pool bitext contrastive (billions of pairs)</td>
+          <td>CLS</td>
+          <td class="num best">0.280</td>
+          <td class="num best">1.000 (DC, L12)</td>
+        </tr>
+      </tbody>
+    </table>
+    <p>Corpus: NTREX-128 pilot, 326 parallel blocks per language (en, de, ar, zh, hi, sw),
+    ~100–150 English words/block (~151 mBERT subword tokens). Layers: {0, 2, 4, 6, 8, 10, 12}.
+    All metrics averaged over 5 en&rarr;X pairs unless stated.</p>
+    <p><strong>DC = mean-pool identity:</strong>
+    F[:,0] = &radic;n&middot;mean<sub>t</sub>(H[t,:]) &rArr; cos(DC<sub>A</sub>, DC<sub>B</sub>) = cos(mean(H<sup>A</sup>), mean(H<sup>B</sup>)).
+    Standard mean-pool retrieval used in most multilingual retrieval papers equals band_adv[DC].</p>
+    <div class="caveat">
+      <strong>Caveats.</strong>
+      (1) All metrics are point estimates over 326 blocks; no bootstrap confidence intervals are reported.
+      Layer and band rankings may not be stable under resampling.
+      (2) Band vectors are subword-pooled; word-pooled representations may give different band energy distributions, especially for morphologically rich languages.
+      (3) Cached npz results are keyed only by model name; changes to tokenizer version, layer list, or DCT configuration require <code>--no_skip</code> to invalidate.
+    </div>
+  </div>
+
+  <!-- 3. DC vs Low — per language pair -->
+  <div class="card">
+    <h2><span class="num">3</span> DC vs Low Band P@1 — Per Language Pair</h2>
+    <img src="fig1_mbert_dc_vs_low_per_pair.svg" alt="mBERT DC vs Low P@1 by layer, per language pair">
+    <p class="fig-caption">
+      Figure 1. mBERT DC (=mean-pool) vs Low band P@1 by layer, one panel per language pair.
+      Orange dashed lines mark layers where Low &gt; DC.
+      The sw panel is qualitatively different: DC is poor throughout, and Low provides a large gain at L8 (+26.5pp).
+    </p>
+    <div class="summary">
+      <ul>
+        <li>
+          <strong>mBERT: Low at L8 beats L12 mean-pool (P@1=0.477) by +32pp</strong> on average,
+          but the effect is highly language-dependent (see table below).
+        </li>
+        <li>
+          <strong>en-sw is an outlier:</strong> DC P@1 = 0.449 at L8 (the lowest across all pairs and layers),
+          while Low reaches 0.715 — a +26.5pp gap. For all other pairs the gap is at most +3.2pp.
+          The sw DC signal is poor throughout all layers, whereas Low provides a consistent fallback.
+          This is consistent with mBERT's limited Swahili training data: Swahili text (Latin-script,
+          agglutinative) likely gets tokenized into many short subword pieces shared with English,
+          making the mean-pool direction non-discriminative, while the Low band captures more
+          content-specific positional variation.
+        </li>
+        <li>
+          <strong>en-hi and en-zh:</strong> Low does not beat DC at L8 (differences: &minus;3.1pp and &minus;0.6pp).
+          DC is the better choice at all layers for these pairs at this model.
+        </li>
+      </ul>
+    </div>
+    <table>
+      <thead><tr>
+        <th>Pair</th>
+        <th class="num-col">DC P@1 at L8</th>
+        <th class="num-col">Low P@1 at L8</th>
+        <th class="num-col">Low&minus;DC</th>
+        <th class="num-col">DC P@1 at L12</th>
+      </tr></thead>
+      <tbody>
+        <tr><td>en-de</td><td class="num">0.959</td><td class="num best">0.982</td><td class="num">+0.023</td><td class="num">0.724</td></tr>
+        <tr><td>en-ar</td><td class="num">0.765</td><td class="num best">0.798</td><td class="num">+0.032</td><td class="num">0.469</td></tr>
+        <tr><td>en-zh</td><td class="num best">0.857</td><td class="num">0.851</td><td class="num warn">&minus;0.006</td><td class="num">0.696</td></tr>
+        <tr><td>en-hi</td><td class="num best">0.673</td><td class="num">0.643</td><td class="num warn">&minus;0.031</td><td class="num">0.291</td></tr>
+        <tr><td>en-sw</td><td class="num warn">0.449</td><td class="num best">0.715</td><td class="num best">+0.265</td><td class="num warn">0.202</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 4. DC P@1 by layer — all models, per pair -->
+  <div class="card">
+    <h2><span class="num">4</span> DC P@1 by Layer and Language Pair — All Models</h2>
+    <img src="fig2_dc_p1_per_pair_3models.svg" alt="DC P@1 by layer, 5 pairs, 3 models">
+    <p class="fig-caption">
+      Figure 2. DC band (= mean-pool) P@1 across layers, one panel per model, five lines per pair.
+      mBERT: en-de peaks early and high; en-sw is consistently the weakest.
+      XLM-R: all pairs collapse at L12; peak retrieval shifts to L4&ndash;L6.
+      LaBSE: saturates to &ge;0.95 by L6 for all pairs.
+    </p>
+    <table>
+      <thead><tr>
+        <th>Layer</th>
+        <th class="num-col">mBERT DC</th>
+        <th class="num-col">XLM-R DC</th>
+        <th class="num-col">LaBSE DC</th>
+      </tr></thead>
+      <tbody>
+        <tr><td>L0 (embed)</td><td class="num">0.033</td><td class="num">0.030</td><td class="num">0.045</td></tr>
+        <tr><td>L2</td><td class="num">0.031</td><td class="num">0.007</td><td class="num warn">0.018</td></tr>
+        <tr><td>L4</td><td class="num">0.019</td><td class="num">0.007</td><td class="num">0.059</td></tr>
+        <tr><td>L6</td><td class="num">0.019</td><td class="num">0.010</td><td class="num">0.097</td></tr>
+        <tr><td>L8</td><td class="num">0.048</td><td class="num">0.010</td><td class="num warn">0.053</td></tr>
+        <tr><td>L10</td><td class="num">0.031</td><td class="num">0.009</td><td class="num">0.096</td></tr>
+        <tr><td>L12</td><td class="num best">0.100</td><td class="num warn">0.001</td><td class="num best">0.280</td></tr>
+      </tbody>
+    </table>
+    <p class="fig-caption">band_adv values averaged over 5 en&rarr;X pairs. LaBSE DC is non-monotonic (dips at L2=0.018 and L8=0.053).</p>
+  </div>
+
+  <!-- 5. Band P@1 at L8, per pair -->
+  <div class="card">
+    <h2><span class="num">5</span> mBERT L8: P@1 Profile Across Bands, Per Language Pair</h2>
+    <img src="fig3_mbert_L8_band_p1_per_pair.svg" alt="mBERT L8 P@1 by band, per language pair">
+    <p class="fig-caption">
+      Figure 3. mBERT L8 bidirectional P@1 per band, per language pair.
+      All pairs peak at DC or Low and decline for higher bands. The sw line is anomalously low at DC
+      but recovers to 0.715 at Low, while the other pairs are highest at DC.
+    </p>
+    <div class="summary">
+      <ul>
+        <li>
+          <strong>Energy &#x2260; discriminativeness.</strong>
+          band_energy measures signal magnitude; P@1 measures whether that band's direction
+          distinguishes parallel from non-parallel blocks. These are orthogonal:
+          a low-energy band (e.g. Low in XLM-R at 0.2%) can still achieve high P@1 if
+          its direction is informative. Cosine similarity normalises vectors before comparing,
+          so scale is irrelevant to retrieval.
+        </li>
+        <li>
+          <strong>All pairs drop steeply past Low.</strong>
+          Mid, High, and VHigh bands carry positional/syntactic variation that is
+          not consistent across parallel texts, so P@1 falls toward random for those bands.
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 6. XLM-R anisotropy -->
+  <div class="card">
+    <h2><span class="num">6</span> XLM-R Representation Degeneration — A Spectral Diagnosis</h2>
+    <p>See Figure 2 (DC P@1 by layer per pair) for XLM-R's collapse at L12 across all language pairs.</p>
+    <div class="two-col">
+      <div>
+        <h3>XLM-R band_energy at L12 (English side)</h3>
+        <table>
+          <thead><tr><th>Band</th><th class="num-col">band_energy</th><th class="num-col">band_adv</th></tr></thead>
+          <tbody>
+            <tr><td><strong>DC</strong></td><td class="num warn">0.971</td><td class="num warn">0.001</td></tr>
+            <tr><td>Low</td><td class="num">0.002</td><td class="num best">0.030</td></tr>
+            <tr><td>Mid</td><td class="num">0.003</td><td class="num">0.012</td></tr>
+            <tr><td>High</td><td class="num">0.007</td><td class="num">0.004</td></tr>
+            <tr><td>VeryHigh</td><td class="num">0.017</td><td class="num">0.002</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <h3>Interpretation</h3>
+        <p>
+          97% of XLM-R's band energy at L12 lives in DC — every block's hidden states
+          are dominated by a single global "background" direction.
+          Since all blocks share this direction, the mean-pool cosine between
+          <em>any</em> two blocks (parallel or not) is near 1 &mdash; the
+          diagonal of the cosine matrix &asymp; the off-diagonal, yielding band_adv[DC] &asymp; 0.
+        </p>
+        <p>
+          The Low band holds only 0.2% of the energy, yet it is associated with band_adv = 0.030
+          (the model's primary alignment axis). The residual after removing the
+          degenerate mean retains meaningful cross-lingual structure.
+        </p>
+        <p>
+          This suggests a <em>spectral representation-degeneration test</em>:
+          if band_energy[DC] &rarr; 1 while band_adv[DC] &rarr; 0,
+          the model's representations may have collapsed to a single direction.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 7. LaBSE -->
+  <div class="card">
+    <h2><span class="num">7</span> LaBSE: Alignment Signal Across All Frequency Bands</h2>
+    <p>
+      LaBSE was trained with CLS-pool contrastive learning (not mean-pool), yet it shows
+      the highest DC band_adv and near-perfect P@1 across <em>all</em> bands.
+    </p>
+    <table>
+      <thead><tr>
+        <th>Layer</th>
+        <th class="num-col">DC band_adv</th>
+        <th class="num-col">Low band_adv</th>
+        <th class="num-col">DC P@1</th>
+        <th class="num-col">Low P@1</th>
+        <th class="num-col">High P@1</th>
+        <th class="num-col">VHigh P@1</th>
+      </tr></thead>
+      <tbody>
+        <tr><td>L0</td><td class="num">0.045</td><td class="num">0.012</td><td class="num">0.151</td><td class="num">0.043</td><td class="num">0.055</td><td class="num">0.086</td></tr>
+        <tr><td>L6</td><td class="num">0.097</td><td class="num">0.041</td><td class="num">0.951</td><td class="num">0.538</td><td class="num">0.900</td><td class="num">0.879</td></tr>
+        <tr><td>L8</td><td class="num">0.053</td><td class="num">0.050</td><td class="num">0.897</td><td class="num">0.646</td><td class="num">0.948</td><td class="num">0.939</td></tr>
+        <tr><td>L10</td><td class="num">0.096</td><td class="num">0.063</td><td class="num">0.985</td><td class="num">0.790</td><td class="num">0.966</td><td class="num">0.909</td></tr>
+        <tr><td>L12</td><td class="num best">0.280</td><td class="num best">0.129</td><td class="num best">1.000</td><td class="num best">0.987</td><td class="num best">0.962</td><td class="num">0.924</td></tr>
+      </tbody>
+    </table>
+    <div class="warning">
+      <strong>Implication for Phase 1b hypothesis.</strong>
+      The claim "mean-pool training specifically aligns DC" is weakened by LaBSE, which uses
+      CLS-pool yet shows the highest DC alignment. However, LaBSE was trained on hundreds of
+      millions of bitext pairs vs. the ~250 training blocks available in Phase 1b.
+      The comparison is confounded by data scale.
+      Phase 1b controls for this by fine-tuning <em>mBERT only</em> on the same NTREX train split
+      (~250 blocks), comparing mean-pool vs CLS-pool InfoNCE. LaBSE remains a <em>descriptive
+      reference</em> showing what heavily supervised training is associated with, not a causal control.
+    </div>
+  </div>
+
+  <!-- 8. Cumulative alignment -->
+  <div class="card">
+    <h2><span class="num">8</span> Cumulative Band Recovery (cum_band_adv)</h2>
+    <img src="fig5_cumadv_3models.svg" alt="cum_band_adv final layer 3 models">
+    <p class="fig-caption">
+      Figure 7. cum_band_adv at the final layer per model. mBERT and LaBSE: strictly decreasing
+      (DC alone is the optimal concatenation). XLM-R: flat near zero throughout.
+    </p>
+    <p>
+      For mBERT and LaBSE, adding bands beyond DC consistently reduces cumulative retrieval,
+      because higher-frequency components carry translation-agnostic variance (syntactic/positional
+      patterns that differ between parallel texts). XLM-R's near-zero cum_band_adv at all bands
+      reflects the degenerate DC signal dominating the norm even though Low has independent signal.
+    </p>
+    <table>
+      <thead><tr>
+        <th>Model</th>
+        <th class="num-col">cum_band_adv[DC]</th>
+        <th class="num-col">+Low</th>
+        <th class="num-col">+Mid</th>
+        <th class="num-col">+VHigh</th>
+        <th>Monotone ↓?</th>
+      </tr></thead>
+      <tbody>
+        <tr><td><span class="mtag teal">mBERT</span></td>
+            <td class="num best">0.100</td><td class="num">0.094</td>
+            <td class="num">0.080</td><td class="num">0.043</td>
+            <td><strong style="color:var(--green)">Yes</strong></td></tr>
+        <tr><td><span class="mtag olive">XLM-R</span></td>
+            <td class="num warn">0.001</td><td class="num">0.001</td>
+            <td class="num">0.001</td><td class="num">0.001</td>
+            <td>Flat &asymp; 0</td></tr>
+        <tr><td><span class="mtag rose">LaBSE</span></td>
+            <td class="num best">0.302</td><td class="num">0.301</td>
+            <td class="num">0.295</td><td class="num">0.258</td>
+            <td><strong style="color:var(--green)">Yes</strong></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 9. P@1 asymmetry -->
+  <div class="card">
+    <h2><span class="num">9</span> Directional P@1 Asymmetry</h2>
+    <img src="fig4_mbert_low_directional_p1.svg" alt="P@1 asymmetry mBERT Low band per pair">
+    <p class="fig-caption">
+      Figure 4. Per-pair directional P@1 for mBERT Low band across layers.
+      Solid lines = en&rarr;tgt; dashed lines = tgt&rarr;en.
+      The gap is largest for typologically distant pairs (hi, sw) and narrows for closer ones (de).
+    </p>
+    <p>
+      Bidirectional P@1 (the mean of both directions) masks a consistent asymmetry:
+      en&rarr;tgt retrieval is substantially easier than tgt&rarr;en, especially for
+      Hindi and Swahili. Selected values at mBERT L8, Low band:
+    </p>
+    <table>
+      <thead><tr>
+        <th>Pair</th>
+        <th class="num-col">en&rarr;tgt P@1</th>
+        <th class="num-col">tgt&rarr;en P@1</th>
+        <th class="num-col">Gap</th>
+      </tr></thead>
+      <tbody>
+        <tr><td>en-de</td><td class="num">0.847</td><td class="num">0.768</td><td class="num">0.079</td></tr>
+        <tr><td>en-ar</td><td class="num">0.801</td><td class="num">0.625</td><td class="num warn">0.176</td></tr>
+        <tr><td>en-zh</td><td class="num">0.820</td><td class="num">0.643</td><td class="num warn">0.177</td></tr>
+        <tr><td>en-hi</td><td class="num">0.791</td><td class="num">0.494</td><td class="num warn">0.297</td></tr>
+        <tr><td>en-sw</td><td class="num">0.847</td><td class="num">0.583</td><td class="num warn">0.264</td></tr>
+      </tbody>
+    </table>
+    <p>
+      The asymmetry likely reflects that English subword representations are higher-norm
+      (more informative Low-band vectors) than the target language representations,
+      making English queries more discriminative than target-language queries.
+      Reported bidirectional P@1 values are the mean of both directions.
+    </p>
+  </div>
+
+  <!-- 10. Energy -->
+  <div class="card">
+    <h2><span class="num">10</span> Band Energy Distribution</h2>
+    <img src="fig7_energy_3models.svg" alt="Band energy 3 models at final layer">
+    <p class="fig-caption">
+      Figure 5. Relative band_energy at L12 (top row: English; bottom row: target-lang mean), per model.
+      XLM-R's DC monopoly (97%) and LaBSE's DC concentration (85%) contrast sharply with mBERT's more distributed profile.
+    </p>
+    <table>
+      <thead><tr>
+        <th>Band</th>
+        <th class="num-col">mBERT band_energy</th>
+        <th class="num-col">XLM-R band_energy</th>
+        <th class="num-col">LaBSE band_energy</th>
+      </tr></thead>
+      <tbody>
+        <tr><td>DC</td><td class="num">0.380</td><td class="num warn">0.971</td><td class="num warn">0.849</td></tr>
+        <tr><td>Low</td><td class="num">0.056</td><td class="num">0.002</td><td class="num">0.008</td></tr>
+        <tr><td>Mid</td><td class="num">0.089</td><td class="num">0.003</td><td class="num">0.016</td></tr>
+        <tr><td>High</td><td class="num">0.175</td><td class="num">0.007</td><td class="num">0.042</td></tr>
+        <tr><td>VeryHigh</td><td class="num">0.300</td><td class="num">0.017</td><td class="num">0.084</td></tr>
+      </tbody>
+    </table>
+    <p>
+      mBERT has the most distributed energy profile (DC = 38%, VeryHigh = 30%).
+      Both XLM-R and LaBSE are heavily DC-concentrated (97% and 85% respectively),
+      but differ sharply in their band_adv[DC]: XLM-R &asymp; 0 vs LaBSE = 0.280.
+      High DC energy is therefore neither sufficient nor necessary for cross-lingual alignment
+      — the <em>discriminativeness</em> of the DC direction matters, not its energy share alone.
+    </p>
+  </div>
+
+  <!-- 11. Implications -->
+  <div class="card">
+    <h2><span class="num">11</span> Interpretation &amp; Implications</h2>
+    <h3>Three qualitatively distinct trajectories</h3>
+    <ol>
+      <li>
+        <strong>mBERT (MLM-only).</strong> Low-band alignment builds across layers 2–10
+        (peaking at L8 P@1=0.798), then the final layer is associated with a shift toward DC alignment.
+        band_adv[DC] at L12 = 0.100 — moderate but real.
+        The intermediate layer signal is the dominant story.
+      </li>
+      <li>
+        <strong>XLM-R (stronger MLM).</strong> Shows representation degeneration:
+        final-layer DC band_energy = 97% but DC band_adv &asymp; 0.
+        The Low band is the primary alignment axis throughout, carrying more signal
+        (P@1=0.408) than DC (0.388) at L12.
+        Best retrieval is at L6 (DC P@1=0.722) before the collapse.
+      </li>
+      <li>
+        <strong>LaBSE (bitext contrastive).</strong> Non-monotonic DC band_adv across layers
+        (dips at L2 and L8), reaching 0.280 at L12. Near-perfect P@1 across all bands and all
+        layers &ge;L6. High-frequency alignment signal is observed as a side-effect of the
+        training regime, though the causal mechanism is unclear without ablations.
+      </li>
+    </ol>
+    <h3>What this means for Phase 1b</h3>
+    <p>
+      The Phase 1b design (mBERT fine-tuned on NTREX train split, mean-pool vs CLS-pool InfoNCE)
+      should answer: does mean-pool InfoNCE produce the L12 DC spike seen in mBERT base,
+      amplified? And does CLS-pool training produce a LaBSE-style pervasive alignment signature,
+      even at small data scale?
+    </p>
+    <table>
+      <thead><tr><th>Phase 1b hypothesis</th><th>Supported/challenged by Phase 1a?</th></tr></thead>
+      <tbody>
+        <tr>
+          <td>Mean-pool training specifically aligns DC</td>
+          <td>Challenged: LaBSE (CLS-pool) has the highest DC band_adv.
+            But confounded by data scale — Phase 1b controls this.</td>
+        </tr>
+        <tr>
+          <td>CLS-pool training produces different &Delta;band_adv profile</td>
+          <td>Consistent with LaBSE vs mBERT comparison (all bands aligned in LaBSE, DC-dominant in mBERT).
+            Causal attribution requires Phase 1b fine-tuning.</td>
+        </tr>
+        <tr>
+          <td>Middle-layer Low band is trainable</td>
+          <td>Consistent: Low band_adv rises steadily in mBERT with no alignment training.
+            Fine-tuning may amplify this further.</td>
+        </tr>
+        <tr>
+          <td>XLM-R degeneration can be fixed</td>
+          <td>A spectral adapter targeting Low band may recover alignment signal
+            that the L12 collapse is associated with. High-priority Phase 2 target.</td>
+        </tr>
+      </tbody>
+    </table>
+    <h3>Implications for Phase 2 (spectral adapter)</h3>
+    <p>
+      The spectral adapter should target different bands per model:
+    </p>
+    <ul>
+      <li><strong>mBERT:</strong> Low-band adapter at L8, to amplify the naturally emerging Low alignment before the L12 DC shift.</li>
+      <li><strong>XLM-R:</strong> DC-band adapter at L6 (before the collapse), to recover the mean-pool alignment that degenerates at L12. The spectral diagnosis (band_energy[DC]&rarr;1, band_adv[DC]&rarr;0) suggests the collapse happens in L10–L12 specifically.</li>
+    </ul>
+    <div class="warning">
+      <strong>Next steps:</strong>
+      (1) Design Phase 1b fine-tuning on NTREX train split (mBERT only, same data,
+      mean-pool vs CLS-pool InfoNCE). (2) Verify that the Low-band L8 advantage
+      holds on FLORES-200 devtest (shorter sequences &mdash; band widths will differ,
+      but the relative pattern should persist if the finding is about linguistic structure
+      rather than sequence-length artifacts). (3) Run Direction 1 probes on
+      mBERT L8 Low-band vectors to test whether they are more task-predictive
+      (POS/DEP) than L12 DC vectors.
+    </div>
+  </div>
+
+  <!-- 12. Reproduction -->
+  <div class="card">
+    <h2><span class="num">12</span> Reproduction</h2>
+    <pre><code><span style="color:#5e8599"># from spectral-probing/</span>
+
+<span style="color:#5e8599"># 1. Embed all 3 models (xlmr and labse via SLURM)</span>
+sbatch embed.slurm mbert
+sbatch embed.slurm xlmr
+sbatch embed.slurm labse
+
+<span style="color:#5e8599"># 2. Metrics for each model</span>
+for MODEL in mbert xlmr labse; do
+  python -m direction2.metrics \
+    --model $MODEL --pool subword \
+    --lang_a en --lang_b de ar zh hi sw \
+    --embed_dir direction2/results/embed \
+    --out_dir direction2/results/metrics \
+    --no_skip
+done
+
+<span style="color:#5e8599"># 3. Regenerate plots and this report</span>
+/u501/x25luo/.conda/envs/grounding/bin/python3 \
+    direction2/results/report_phase1a/make_plots.py</code></pre>
+  </div>
+
+</div>
+</body>
+</html>

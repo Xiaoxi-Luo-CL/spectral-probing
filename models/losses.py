@@ -18,10 +18,13 @@ class LabelLoss(nn.Module):
             f'<{self.__class__.__name__}: loss=XEnt, num_classes={len(self._classes)}>'
 
     def _gen_target_labels(self, logits, targets):
+        # Unknown labels (e.g. target-language-specific tags) map to -1,
+        # which is the ignore_index for CrossEntropyLoss and is excluded from accuracy computation below.
         target_labels = torch.tensor(
-            [self._class2id[c] for c in targets], dtype=torch.long,
+            [self._class2id.get(c, -1) for c in targets], dtype=torch.long,
             device=logits.device
         )  # (num_targets,)
+        # original: [self._class2id[c] for c in targets]
 
         return target_labels
 
@@ -44,9 +47,17 @@ class LabelLoss(nn.Module):
         flat_logits = logits[torch.sum(logits, dim=-1) != float('-inf'), :]
         labels = torch.argmax(flat_logits, dim=-1)
 
-        # compute label accuracy
-        num_label_matches = torch.sum(labels == target_labels)
-        accuracy = float(num_label_matches / labels.shape[0])
+        assert target_labels.shape == labels.shape, f"target_labels shape {target_labels.shape} does not match labels shape {labels.shape}"
+
+        # exclude tokens with unknown labels (mapped to -1) from accuracy
+        # ------ original ------:
+        # num_label_matches = torch.sum(labels == target_labels)
+        # accuracy = float(num_label_matches / labels.shape[0])
+        known = target_labels != -1
+        if known.sum() == 0:
+            return 0.0
+        num_label_matches = torch.sum(labels[known] == target_labels[known])
+        accuracy = float(num_label_matches / known.sum())
 
         return accuracy
 

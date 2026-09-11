@@ -6,6 +6,22 @@ import datetime
 import torch
 import matplotlib.pyplot as plt
 import numpy as np
+import glob
+
+
+def skip_experiment(lm_name, train_path, base_results_dir="results"):
+    '''Check if an experiment with the same model, task, and language already exists in the results directory.'''
+    model = lm_name.split('/')[-1] if '/' in lm_name else lm_name
+    task_name = train_path.split('/')[-2]
+    lan = os.path.basename(train_path).split('-')[0]
+    pattern = f"*_{model}_{task_name}_{lan}"
+    search_path = os.path.join(base_results_dir, "**", pattern)
+    existing_dirs = glob.glob(search_path, recursive=True)
+    # if picture spectral_profile.png exists in the directory, then skip
+    for d in existing_dirs:
+        if os.path.exists(os.path.join(d, 'spectral_profile.png')):
+            return True, d
+    return False, None
 
 
 def create_save_dir(folder='', suffix=''):
@@ -133,8 +149,10 @@ def check_args(args):
             "[Error] Relative/position embeddings can only be used with label classification tasks. Exiting."
 
     if not args.repeat_labels:
-        assert args.embedding_pooling is not None, \
-            "Embedding pooling must be specified when repeat_labels is False."
+        assert args.embedding_pooling is not None or args.pool_word_embed is not None, \
+            "Embedding pooling (sentence-level) or word embedding pooling (word-level) must be specified when repeat_labels is False."
+    if args.repeat_labels:
+        assert args.pool_word_embed is None, "Word embedding pooling cannot be used when repeat_labels is True."
     if args.repeat_labels and args.embedding_pooling is not None:
         logging.warning(
             "repeat_labels=True with embedding_pooling is not common practice.")

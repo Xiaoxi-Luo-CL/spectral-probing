@@ -7,14 +7,33 @@ __pycache__/
 *.so
 # *.csv
 # *.conllu
-results/
+direction1/results/
+direction1/transfer/results_cond_i/
+direction1/transfer/results_coverage/
+direction1/transfer/figures/
+direction1/analysis/*.pt
+direction1/analysis/*.npy
+direction1/analysis/*.png
+direction1/analysis/paper_figures/pos_word_pooling/
+tasks/
+direction2/results/embed/
+direction2/results/metrics/
 archive/
 *.err
 *.out
-slurm.sh
 slurm/
 *.sh
 submit_jobs.py
+init_explore/
+paper/
+data/
+!direction2/data/
+direction2/data/*
+!direction2/data/.gitkeep
+!direction2/data/DCEP/
+direction2/data/DCEP/*
+!direction2/data/DCEP/build_nway.py
+!direction2/data/DCEP/README.md
 
 # Distribution / packaging
 .Python
