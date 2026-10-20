@@ -1,3 +1,5 @@
+> **Replicating the cross-lingual spectral-transfer experiments (Direction 1):** see [REPLICATION.md](REPLICATION.md).
+
 ## Supported Models & Languages
 + Languages (${lan}): zh, ja, es, fr, de, en
 + Models (${model}): `bert-base-multilingual-cased`, `FacebookAI/xlm-roberta-base (XLM-R)`, `bigscience/bloom-560m`, `bigscience/bloom-1b1`, `bigscience/bloom-1b7`, `bigscience/bloom-3b`, `bigscience/bloom-7b1`, `mistralai/Mistral-7B-v0.1`
