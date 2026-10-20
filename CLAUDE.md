@@ -17,3 +17,5 @@
 + You should challenge me when I have a rough idea, so we can change fuzzy ideas into something concrete before witing code.
 
 + Do not use long lines or dashed lines to devide code into parts (e.g., ------ or ======)
+
++ Make your code as simple and easy-to-read as possible.

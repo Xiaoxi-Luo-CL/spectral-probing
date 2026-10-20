@@ -70,11 +70,11 @@ LANGUAGES = [
     ("ja",  "high", 500, "EXISTING"),
 ]
 
-BASE_DIR = Path(__file__).resolve().parent.parent   # spectral-probing/
-UD_DIR = BASE_DIR / "ud-treebanks-v2.17"
+BASE_DIR = Path(__file__).resolve().parents[2]   # spectral-probing/ (this file is in direction1/transfer/)
+UD_DIR = BASE_DIR / "data" / "ud-treebanks-v2.17"
 UDSTD_DIR = BASE_DIR / "tasks" / "ud-syntax"
 OUT_DIR = BASE_DIR / "tasks" / "ud-syntax" / "coverage-relations"
-TARGETS_JSON = BASE_DIR / "transfer" / "coverage_targets.json"
+TARGETS_JSON = BASE_DIR / "direction1" / "transfer" / "coverage_targets.json"
 
 
 # ---------------------------------------------------------------------------

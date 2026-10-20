@@ -39,7 +39,7 @@ class LabelLoss(nn.Module):
 
         return self._xe_loss(flat_logits, target_labels)
 
-    def get_accuracy(self, logits, targets):
+    def get_accuracy(self, logits, targets, return_count=False):
         # gather target labels
         target_labels = self._gen_target_labels(logits, targets)
         # get labels from logits
@@ -54,12 +54,14 @@ class LabelLoss(nn.Module):
         # num_label_matches = torch.sum(labels == target_labels)
         # accuracy = float(num_label_matches / labels.shape[0])
         known = target_labels != -1
-        if known.sum() == 0:
-            return 0.0
+        num_known = int(known.sum())
+        if num_known == 0:
+            return (0.0, 0) if return_count else 0.0
         num_label_matches = torch.sum(labels[known] == target_labels[known])
-        accuracy = float(num_label_matches / known.sum())
+        accuracy = float(num_label_matches / num_known)
 
-        return accuracy
+        # the count lets callers weight each batch by how many labels it scored
+        return (accuracy, num_known) if return_count else accuracy
 
 
 class RegressionLoss(nn.Module):
@@ -86,8 +88,9 @@ class RegressionLoss(nn.Module):
         target_values = self._label2float(targets, logits.device)
         return self._mse_loss(flat_logits, target_values)
 
-    def get_accuracy(self, logits, targets):
+    def get_accuracy(self, logits, targets, return_count=False):
         '''return accuracy after rounding to nearest integer'''
+        num_scored = int((~torch.isnan(logits)).sum())
         if self.round_acc:
             mask = ~torch.isnan(logits)
             flat_logits = logits[mask].squeeze()
@@ -95,6 +98,7 @@ class RegressionLoss(nn.Module):
             # as long as the prediction is within [3.5, 4.5), we think it is 4
             preds = torch.round(flat_logits)
             correct = (preds == target_tensor).float()
-            return correct.mean().item()
+            accuracy = correct.mean().item()
         else:
-            return self.forward(logits, targets)
+            accuracy = self.forward(logits, targets)
+        return (accuracy, num_scored) if return_count else accuracy

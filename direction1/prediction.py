@@ -9,7 +9,7 @@ import torch.nn as nn
 # local imports
 from utils.setup import (setup_experiment)
 from utils.datasets import LabelledDataset
-from utils.training import classify_dataset
+from utils.training import classify_dataset, weighted_accuracy
 from models.encoders import PrismEncoder
 from models.classifiers import load_classifier
 
@@ -131,10 +131,10 @@ def main():
         )
 
         logging.info(
-            f"Mode {mode} Prediction completed with Acc: {np.mean(stats['accuracy']):.4f}, Loss: {np.mean(stats['loss']):.4f} (mean over batches).")
+            f"Mode {mode} Prediction completed with Acc: {weighted_accuracy(stats):.4f} (over labels), Loss: {np.mean(stats['loss']):.4f} (mean over batches).")
 
         results[(mode, para)] = {
-            'accuracy': np.mean(stats['accuracy']),
+            'accuracy': weighted_accuracy(stats),
             'loss': np.mean(stats['loss'])
         }
 

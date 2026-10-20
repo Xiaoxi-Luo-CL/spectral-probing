@@ -12,7 +12,7 @@ class PrismEncoder(nn.Module):
     def __init__(
             self, lm_name, frq_filter, frq_tuning=False,
             emb_tuning=False, emb_pooling=None, specials=False,
-            cache=None, embed_layer=None, max_length=512, pool_word_embed=None):
+            cache=None, embed_layer=None, max_length=512, pool_word_embed=None, frq_logits=None):
         super().__init__()
         # load transformer
         transformers.logging.set_verbosity_error()
@@ -42,6 +42,8 @@ class PrismEncoder(nn.Module):
         self._emb_pooling = emb_pooling
         # frequency filter parameter
         self._frq_tuning = frq_tuning
+        # learned filters are logits whether or not they are still trained; fixed band masks are not
+        self._frq_logits = frq_tuning if frq_logits is None else frq_logits
         self._frq_filter = None if frq_filter is None else nn.Parameter(
             frq_filter)
         # public variables
@@ -87,10 +89,12 @@ class PrismEncoder(nn.Module):
         lm_name = objects['language_model_name']
         emb_pooling = objects.get('embedding_pooling', emb_pooling)
         frq_filter = objects.get('frequency_filter', frq_filter)
+        # a filter stored in a checkpoint is always a learned logit, even when loaded frozen
+        frq_logits = True if 'frequency_filter' in objects else None
         # construct model
         encoder = PrismEncoder(
             lm_name=lm_name, frq_filter=frq_filter, frq_tuning=frq_tuning, emb_tuning=emb_tuning,
-            emb_pooling=emb_pooling, specials=specials, cache=cache
+            emb_pooling=emb_pooling, specials=specials, cache=cache, frq_logits=frq_logits
         )
         # load LM (if available)
         encoder._lm = objects.get('language_model', encoder._lm)
@@ -98,7 +102,7 @@ class PrismEncoder(nn.Module):
 
     @classmethod
     def from_lm(cls, lm, tok, lm_name, frq_filter, frq_tuning,
-                pool_word_embed, cache=None, max_length=512):
+                pool_word_embed, cache=None, max_length=512, frq_logits=None):
         """
         Construct a PrismEncoder reusing a pre-loaded LM and tokenizer.
         Avoids the expensive AutoModel.from_pretrained() call.
@@ -118,6 +122,7 @@ class PrismEncoder(nn.Module):
         encoder._specials = False
         encoder._emb_pooling = None
         encoder._frq_tuning = frq_tuning
+        encoder._frq_logits = frq_tuning if frq_logits is None else frq_logits
         encoder._frq_filter = (
             None if frq_filter is None else nn.Parameter(frq_filter)
         )
@@ -324,9 +329,9 @@ class PrismEncoder(nn.Module):
             frq_filter = F.adaptive_avg_pool1d(
                 self._frq_filter[None, :], int(seq_len))
             # frq_filter = F.adaptive_max_pool1d(self._frq_filter[None, :], int(seq_len))
-            # normalize filter values to [0, 1] for learnable filter
+            # learned filters are logits mapped to [0, 1]; fixed band masks are already 0/1
             frq_filter = torch.sigmoid(
-                frq_filter) if self._frq_tuning else frq_filter
+                frq_filter) if self._frq_logits else frq_filter
             # element-wise multiplication of filter with each row (no expansion needed due to prior pooling)
             seq_filtered = seq_frequencies * frq_filter
             # perform inverse DCT

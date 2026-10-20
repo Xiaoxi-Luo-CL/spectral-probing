@@ -1,0 +1,32 @@
+[
+  {
+    "path": "tasks/ud-syntax/coverage-relations/bho-all-relations.csv",
+    "lang": "bho",
+    "official_test": 0
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/hsb-all-relations.csv",
+    "lang": "hsb",
+    "official_test": 0
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/nds-all-relations.csv",
+    "lang": "nds",
+    "official_test": 500
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/oc-all-relations.csv",
+    "lang": "oc",
+    "official_test": 613
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/scn-all-relations.csv",
+    "lang": "scn",
+    "official_test": 0
+  },
+  {
+    "path": "tasks/ud-syntax/coverage-relations/yue-all-relations.csv",
+    "lang": "yue",
+    "official_test": 0
+  }
+]

@@ -1,0 +1,18 @@
+{
+  "pairs": [
+    {"source": "hi", "target": "bho", "unrelated": "zh"},
+    {"source": "cs", "target": "hsb", "unrelated": "zh"},
+    {"source": "de", "target": "nds", "unrelated": "zh"},
+    {"source": "ca", "target": "oc", "unrelated": "zh"},
+    {"source": "it", "target": "scn", "unrelated": "zh"},
+    {"source": "zh", "target": "yue", "unrelated": "en"}
+  ],
+  "targets": {
+    "bho": ["UD_Bhojpuri-BHTB"],
+    "hsb": ["UD_Upper_Sorbian-UFAL"],
+    "nds": ["UD_Low_Saxon-LSDC"],
+    "oc": ["UD_Occitan-TTB"],
+    "scn": ["UD_Sicilian-STB"],
+    "yue": ["UD_Cantonese-HK"]
+  }
+}

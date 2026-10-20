@@ -23,6 +23,12 @@ archive/
 *.out
 slurm/
 *.sh
+# launchers that produced direction1/transfer/results_coverage_v2 stay tracked for reproducibility
+!direction1/scripts/slurm_transfer.sh
+!direction1/scripts/submit_transfer.sh
+!direction1/scripts/submit_transfer_v3.sh
+!direction1/scripts/submit_pairs.sh
+!direction1/scripts/submit_schedule_check.sh
 submit_jobs.py
 init_explore/
 paper/

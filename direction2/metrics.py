@@ -30,8 +30,8 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from direction2.bands import band_bounds
-from direction2.embed import load_embed
+from direction2.bands import SCHEMES, band_bounds
+from direction2.embed import load_embed, pool_dir, WORD_POOL_EXCLUDED
 from models.encoders import PrismEncoder
 
 
@@ -75,7 +75,8 @@ def retrieval_p1(cos_mat):
     return p1_ab, p1_ba
 
 
-def compute_pair_metrics(bands_A, mu_A, ids_A, seq_lens_A, bands_B, mu_B, ids_B, seq_lens_B):
+def compute_pair_metrics(bands_A, mu_A, ids_A, seq_lens_A, bands_B, mu_B, ids_B, seq_lens_B,
+                         scheme='abs'):
     """Compute all alignment metrics for one language pair.
 
     Joins on block_id so row order in the two npz files does not need to match.
@@ -109,11 +110,11 @@ def compute_pair_metrics(bands_A, mu_A, ids_A, seq_lens_A, bands_B, mu_B, ids_B,
 
     # Parseval bandwidth factor: width_b(T) = k_hi - k_lo for each block
     widths_A = np.array(
-        [[bb[1] - bb[0] for bb in band_bounds(max(int(t), 1))] for t in seq_lens_A],
+        [[bb[1] - bb[0] for bb in band_bounds(max(int(t), 1), scheme)] for t in seq_lens_A],
         dtype=np.float32,
     )  # (n, n_bands)
     widths_B = np.array(
-        [[bb[1] - bb[0] for bb in band_bounds(max(int(t), 1))] for t in seq_lens_B],
+        [[bb[1] - bb[0] for bb in band_bounds(max(int(t), 1), scheme)] for t in seq_lens_B],
         dtype=np.float32,
     )  # (n, n_bands)
 
@@ -232,6 +233,10 @@ def parse_args():
     p.add_argument('--verify', action='store_true', help='run DC identity check and exit')
     p.add_argument('--model', default=None)
     p.add_argument('--pool', default='subword', choices=('subword', 'word'))
+    p.add_argument('--bands', default='abs', choices=SCHEMES, dest='bands_scheme',
+                   help='abs: T-relative k boundaries; rel: fixed k=4,16,64')
+    p.add_argument('--corpus', default='',
+                   help='corpus identifier; must match the one used in embed.py')
     p.add_argument('--lang_a', nargs='+', default=['en'])
     p.add_argument('--lang_b', nargs='+', default=[])
     p.add_argument('--embed_dir', default='direction2/results/embed')
@@ -247,8 +252,10 @@ def main():
         return
     if not args.model or not args.lang_b:
         raise SystemExit('--model and --lang_b are required unless --verify is set')
-    embed_root = Path(args.embed_dir) / args.model / args.pool
-    out_dir = Path(args.out_dir) / args.model / args.pool
+    pdir = pool_dir(args.pool, args.bands_scheme)
+    def _base(root): return Path(root) / args.corpus / args.model if args.corpus else Path(root) / args.model
+    embed_root = _base(args.embed_dir) / pdir
+    out_dir = _base(args.out_dir) / pdir
     out_dir.mkdir(parents=True, exist_ok=True)
 
     cache = {}
@@ -262,6 +269,11 @@ def main():
         for lb in args.lang_b:
             if la == lb:
                 continue
+            if args.pool == 'word':
+                excluded = [l for l in (la, lb) if l in WORD_POOL_EXCLUDED]
+                if excluded:
+                    print(f'  [{la}-{lb}] skipped — word pooling excluded for: {", ".join(excluded)}')
+                    continue
             out_path = out_dir / f'{la}-{lb}.npz'
             if not args.no_skip and out_path.exists():
                 print(f'  [{la}-{lb}] exists — skip')
@@ -269,7 +281,8 @@ def main():
             print(f'  [{la}-{lb}] computing ...')
             bands_A, mu_A, ids_A, _, seq_lens_A = _load(la)
             bands_B, mu_B, ids_B, _, seq_lens_B = _load(lb)
-            m = compute_pair_metrics(bands_A, mu_A, ids_A, seq_lens_A, bands_B, mu_B, ids_B, seq_lens_B)
+            m = compute_pair_metrics(bands_A, mu_A, ids_A, seq_lens_A, bands_B, mu_B, ids_B,
+                                     seq_lens_B, scheme=args.bands_scheme)
             np.savez_compressed(out_path, **m)
             last = -1
             print(f'    band_adv[last]    : {[f"{v:.3f}" for v in m["band_adv"][last]]}')

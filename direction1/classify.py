@@ -14,7 +14,7 @@ import torch.nn as nn
 from utils.setup import (setup_experiment, create_save_dir, skip_experiment,
                          dir_name, setup_filter, analyze_filter, check_args)
 from utils.datasets import LabelledDataset
-from utils.training import classify_dataset
+from utils.training import classify_dataset, weighted_accuracy
 from models.encoders import PrismEncoder, load_pooling_function
 from models.classifiers import load_classifier
 
@@ -201,7 +201,7 @@ def main():
             return_predictions=True
         )
         logging.info(
-            f"Prediction completed with Acc: {np.mean(stats['accuracy']):.4f}, Loss: {np.mean(stats['loss']):.4f} (mean over batches).")
+            f"Prediction completed with Acc: {weighted_accuracy(stats):.4f} (over labels), Loss: {np.mean(stats['loss']):.4f} (mean over batches).")
 
         # save predicted labels/values to csv file
         if args.loss_type == 'classification':
@@ -247,7 +247,7 @@ def main():
         # print statistics
         logging.info(
             f"[Epoch {ep_idx + 1}/{args.epochs}] Train completed with "
-            f"Acc: {np.mean(ep_stats['accuracy']):.4f}, Loss: {np.mean(ep_stats['loss']):.4f}"
+            f"Acc: {weighted_accuracy(ep_stats):.4f}, Loss: {np.mean(ep_stats['loss']):.4f}"
         )
 
         # iterate over batches in dev split
@@ -256,8 +256,8 @@ def main():
             args.batch_size, repeat_labels=args.repeat_labels,
             mode='eval')
         # store and print statistics
-        for stat in ep_stats:
-            stats[stat].append(np.mean(ep_stats[stat]))
+        stats['loss'].append(np.mean(ep_stats['loss']))
+        stats['accuracy'].append(weighted_accuracy(ep_stats))
         logging.info(
             f"[Epoch {ep_idx + 1}/{args.epochs}] Validation completed with "
             f"Acc: {stats['accuracy'][-1]:.4f}, Loss: {stats['loss'][-1]:.4f}"

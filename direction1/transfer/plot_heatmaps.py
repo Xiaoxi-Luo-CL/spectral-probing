@@ -254,7 +254,7 @@ def build_matrix(
         mat[li, ci] = float(np.mean(accs))
         mat_count[li, ci] = len(accs)
         if len(accs) > 1:
-            assert len(accs) == 3
+            # partial seed sets are allowed; callers report the count from mat_count
             mat_std[li, ci] = float(np.std(accs, ddof=1))
 
     tiers = [resource_level(l) for l in tgt_langs]

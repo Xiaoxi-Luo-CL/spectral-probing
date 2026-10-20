@@ -56,6 +56,21 @@ def truncate_label_for_word_pooling(inputs, flat_labels, encoder):
     return truncated_labels
 
 
+def weighted_accuracy(stats):
+    """Accuracy over every scored label, weighting each batch by how many labels it scored.
+
+    A plain mean over stats['accuracy'] gives each batch equal weight, so a short final
+    batch counts as much as a full one. Batches that scored nothing are dropped, since
+    their accuracy can be nan (e.g. RegressionLoss on an empty batch).
+    """
+    acc = np.asarray(stats['accuracy'], dtype=float)
+    cnt = np.asarray(stats['num_scored'], dtype=float)
+    keep = cnt > 0
+    if not keep.any():
+        return 0.0
+    return float(np.dot(acc[keep], cnt[keep]) / cnt[keep].sum())
+
+
 def classify_dataset(
         classifier, criterion, optimizer,
         dataset, batch_size, mode='train',
@@ -107,12 +122,13 @@ def classify_dataset(
                 loss = criterion(predictions['logits'], labels)
 
         # calculate accuracy
-        accuracy = criterion.get_accuracy(
-            predictions['logits'].detach(), labels)
+        accuracy, num_scored = criterion.get_accuracy(
+            predictions['logits'].detach(), labels, return_count=True)
 
         # store statistics
         stats['loss'].append(float(loss.detach()))
         stats['accuracy'].append(float(accuracy))
+        stats['num_scored'].append(num_scored)
 
         # store predictions
         if return_predictions:
@@ -127,7 +143,7 @@ def classify_dataset(
         pct_complete = (1 - (num_remaining / len(dataset._inputs))) * 100
         sys.stdout.write(
             f"\r[{mode.capitalize()} | Batch {bidx + 1} | {pct_complete:.2f}%] "
-            f"Acc: {np.mean(stats['accuracy']):.4f}, Loss: {np.mean(stats['loss']):.4f}\n"
+            f"Acc: {weighted_accuracy(stats):.4f}, Loss: {np.mean(stats['loss']):.4f}\n"
         )
         sys.stdout.flush()
 

@@ -20,7 +20,7 @@ DCT uses norm='ortho' (orthonormal) so band energies satisfy Parseval exactly.
 Usage (from spectral-probing/):
     python -m direction2.embed \
         --model mbert --pool subword --langs en de ar zh hi sw \
-        --blocks direction2/data/NTREX/aligned/pilot_blocks.json \
+        --blocks direction2/data/NTREX/aligned/ntrex_6way_pilot_min100.json \
         --out_dir direction2/results/embed
 """
 import argparse
@@ -31,10 +31,19 @@ import numpy as np
 import torch
 import transformers
 
-from direction2.bands import N_BANDS, band_rms
+from direction2.bands import N_BANDS, SCHEMES, band_rms
 from models.encoders import PrismEncoder
 
 POOL_MODES = ('subword', 'word')
+
+# Languages where whitespace does not reliably delimit lexical words.
+# Word pooling is skipped (with a warning) for these languages.
+#   zh, yue : no word spaces in Chinese script
+#   ja       : no word spaces in Japanese
+#   th       : spaces separate phrases, not words
+#   dz       : Tibetan tsheg separates syllables; spaces unreliable
+#   vi       : spaces separate syllables, not lexical words
+WORD_POOL_EXCLUDED = frozenset({'zh', 'yue', 'ja', 'th', 'dz', 'vi'})
 
 
 def _pool_words(H, word_ids):
@@ -69,7 +78,7 @@ DEFAULT_LAYERS = [0, 2, 4, 6, 8, 10, 12]
 
 
 @torch.no_grad()
-def embed_block(model, tok, text, layers, pool='subword'):
+def embed_block(model, tok, text, layers, pool='subword', bands_scheme='abs'):
     """Extract band vectors and mu for a single text block.
 
     Args:
@@ -78,6 +87,7 @@ def embed_block(model, tok, text, layers, pool='subword'):
         text: str — block sentences joined with spaces.
         layers: list[int] — hidden state indices (0 = embedding layer).
         pool: 'subword' uses raw content tokens; 'word' averages within whitespace words.
+        bands_scheme: 'abs' for T-relative k-index bands; 'rel' for fixed k=4,16,64 bands.
 
     Returns:
         bands: (n_layers, N_BANDS, d) float32.
@@ -114,12 +124,12 @@ def embed_block(model, tok, text, layers, pool='subword'):
         # norm='ortho' ensures Parseval: sum_k ||F[:,k]||^2 == sum_t ||H[t,:]||^2
         F = PrismEncoder.dct(H.float().T, norm='ortho').cpu().numpy()  # (d, n_pos)
         for b in range(N_BANDS):
-            bands[li, b] = band_rms(F, b)
+            bands[li, b] = band_rms(F, b, scheme=bands_scheme)
 
     return bands, mu, n_pos
 
 
-def embed_lang(model, tok, blocks, lang, layers, pool='subword'):
+def embed_lang(model, tok, blocks, lang, layers, pool='subword', bands_scheme='abs'):
     """Embed all blocks for one language.
 
     Args:
@@ -129,6 +139,7 @@ def embed_lang(model, tok, blocks, lang, layers, pool='subword'):
         lang: str — key into block['texts'].
         layers: list[int].
         pool: 'subword' or 'word'.
+        bands_scheme: 'abs' or 'rel'.
 
     Returns:
         bands: (n_blocks, n_layers, N_BANDS, d) float16.
@@ -149,7 +160,8 @@ def embed_lang(model, tok, blocks, lang, layers, pool='subword'):
         text = ' '.join(block['texts'].get(lang, []))
         if not text:
             continue
-        b_out, m_out, n_pos = embed_block(model, tok, text, layers, pool=pool)
+        b_out, m_out, n_pos = embed_block(model, tok, text, layers, pool=pool,
+                                          bands_scheme=bands_scheme)
         bands[i] = b_out.astype(np.float16)
         mu_arr[i] = m_out.astype(np.float16)
         seq_lens[i] = n_pos
@@ -159,10 +171,16 @@ def embed_lang(model, tok, blocks, lang, layers, pool='subword'):
     return bands, mu_arr, ids, dids, seq_lens
 
 
-def save_embed(path, bands, mu, block_ids, doc_ids, seq_lens):
-    """Save embedding arrays to a compressed npz."""
+def save_embed(path, bands, mu, block_ids, doc_ids, seq_lens, meta=None):
+    """Save embedding arrays to a compressed npz.
+
+    meta: optional dict of provenance fields stored as a JSON string under 'meta_json'.
+    """
+    import json as _json
     Path(path).parent.mkdir(parents=True, exist_ok=True)
-    np.savez_compressed(path, bands=bands, mu=mu, block_ids=block_ids, doc_ids=doc_ids, seq_lens=seq_lens)
+    extra = {'meta_json': np.array(_json.dumps(meta or {}))} if meta else {}
+    np.savez_compressed(path, bands=bands, mu=mu, block_ids=block_ids,
+                        doc_ids=doc_ids, seq_lens=seq_lens, **extra)
 
 
 def load_embed(path):
@@ -171,14 +189,25 @@ def load_embed(path):
     return d['bands'], d['mu'], d['block_ids'], d['doc_ids'], d['seq_lens']
 
 
+def pool_dir(pool, bands_scheme):
+    """Directory name encoding pool mode and band scheme."""
+    return pool if bands_scheme == 'abs' else f'{pool}_rel'
+
+
 def parse_args():
-    p = argparse.ArgumentParser(description='Extract NTREX band vectors per model/language')
+    p = argparse.ArgumentParser(description='Extract band vectors per model/language')
     p.add_argument('--model', required=True, choices=list(MODELS))
     p.add_argument('--pool', default='subword', choices=POOL_MODES)
+    p.add_argument('--bands', default='abs', choices=SCHEMES, dest='bands_scheme',
+                   help='abs: T-relative k boundaries; rel: fixed k=4,16,64')
+    p.add_argument('--corpus', default='',
+                   help='corpus identifier added as a path prefix (e.g. ntrex_pilot, un). '
+                        'Required when running multiple corpora to avoid path collisions.')
     p.add_argument('--langs', nargs='+', required=True, help='short language codes')
-    p.add_argument('--blocks', required=True, help='blocks JSON from ntrex.py')
+    p.add_argument('--blocks', required=True, help='blocks JSON')
     p.add_argument('--out_dir', default='direction2/results/embed')
     p.add_argument('--layers', nargs='+', type=int, default=DEFAULT_LAYERS)
+    p.add_argument('--max_length', type=int, default=512)
     p.add_argument('--no_skip', action='store_true', help='overwrite existing npz files')
     return p.parse_args()
 
@@ -188,22 +217,45 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     transformers.logging.set_verbosity_error()
 
+    if not args.corpus:
+        import warnings
+        warnings.warn('--corpus not set; outputs go directly under out_dir/model/. '
+                      'Set --corpus to avoid collisions when running multiple datasets.')
+
     with open(args.blocks, encoding='utf-8') as f:
         blocks = json.load(f)
 
+    import hashlib
+    blocks_hash = hashlib.md5(Path(args.blocks).read_bytes()).hexdigest()[:8]
+
     model_name = MODELS[args.model]
-    print(f'Loading {model_name} on {device} ...')
+    print(f'Loading {model_name} on {device}  pool={args.pool}  bands={args.bands_scheme}...')
     tok = transformers.AutoTokenizer.from_pretrained(model_name, use_fast=True)
     model = transformers.AutoModel.from_pretrained(model_name, return_dict=True).to(device).eval()
 
+    pdir = pool_dir(args.pool, args.bands_scheme)
+    base = Path(args.out_dir) / args.corpus / args.model if args.corpus else Path(args.out_dir) / args.model
+    meta = {
+        'corpus': args.corpus, 'model': args.model, 'hf_model': model_name,
+        'pool': args.pool, 'bands_scheme': args.bands_scheme,
+        'layers': args.layers, 'max_length': args.max_length,
+        'blocks_file': str(args.blocks), 'blocks_hash': blocks_hash,
+    }
+
     for lang in args.langs:
-        out_path = Path(args.out_dir) / args.model / args.pool / f'{lang}.npz'
+        if args.pool == 'word' and lang in WORD_POOL_EXCLUDED:
+            print(f'  [{lang}] skipped — word pooling excluded (no reliable whitespace word boundaries)')
+            continue
+        out_path = base / pdir / f'{lang}.npz'
         if not args.no_skip and out_path.exists():
             print(f'  [{lang}] exists — skip')
             continue
         print(f'  [{lang}] extracting ...')
-        bds, mu, ids, dids, seq_lens = embed_lang(model, tok, blocks, lang, args.layers, pool=args.pool)
-        save_embed(out_path, bds, mu, ids, dids, seq_lens)
+        bds, mu, ids, dids, seq_lens = embed_lang(
+            model, tok, blocks, lang, args.layers,
+            pool=args.pool, bands_scheme=args.bands_scheme,
+        )
+        save_embed(out_path, bds, mu, ids, dids, seq_lens, meta={**meta, 'lang': lang})
         print(f'  [{lang}] saved  shape={bds.shape}')
 
 
