@@ -108,11 +108,11 @@ def parse_arguments():
     p.add_argument('--output_dir', required=False, default=None,
                    help='Directory to save results and logs')
     # training hyperparameters, only for conditions c/d
-    p.add_argument('--epochs', type=int, default=10)
-    p.add_argument('--early_stop', type=int, default=1)
-    p.add_argument('--min_delta', type=float, default=0.0,
+    p.add_argument('--epochs', type=int, default=100)
+    p.add_argument('--early_stop', type=int, default=2)
+    p.add_argument('--min_delta', type=float, default=1e-3,
                    help='relative dev-loss drop an epoch needs to count as an improvement, for early '
-                        'stopping and LR decay (default 0: any drop counts)')
+                        'stopping and LR decay (0: any drop counts)')
     p.add_argument('--batch_size', type=int, default=32)
     p.add_argument('--learning_rate', type=float, default=1e-3)
     p.add_argument('--decay_rate', type=float, default=0.5, help='lr factor on a dev-loss plateau; 1 = constant lr')

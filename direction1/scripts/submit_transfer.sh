@@ -27,6 +27,8 @@ DRY_RUN=false
 TASK="relations"
 CONDITIONS="Wfroze_Gfroze,Wfroze_Gnone,Wscratch_Gscratch,Wtune_Gtune,Wscratch_Gfroze,Wtune_Gfroze,Wscratch_Gnone,Wtune_Gnone"  # v2 letters a-h
 N_EXAMPLES="50,100,500,1000"
+# v2 protocol, passed explicitly since slurm_transfer.sh now defaults to the v3 one
+EXTRA=(--epochs 10 --early_stop 1 --min_delta 0)
 TARGET_LIST="direction1/transfer/coverage_targets.json"
 OUTPUT_DIR="direction1/transfer/results_coverage_v2"
 SEEDS=(42 43 44)
@@ -69,7 +71,7 @@ for model in "${ENCODER_MODELS[@]}" "${DECODER_MODELS[@]}"; do
                     "$SLURM_SCRIPT" \
                     "$model" "$src_lang" "$src_pool" \
                     "$TASK" "$CONDITIONS" "$N_EXAMPLES" \
-                    "$TARGET_LIST" "$OUTPUT_DIR" "$seed" "$embed_batch"
+                    "$TARGET_LIST" "$OUTPUT_DIR" "$seed" "$embed_batch" "${EXTRA[@]}"
             fi
             (( TOTAL++ )) || true
         done

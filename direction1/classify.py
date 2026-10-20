@@ -65,10 +65,10 @@ def parse_arguments():
     # experiment setup
     arg_parser.add_argument(
         '-e', '--epochs', type=int, default=30,
-        help='maximum number of epochs (default: 50)')
+        help='maximum number of epochs (default: 30)')
     arg_parser.add_argument(
-        '-es', '--early_stop', type=int, default=1,
-        help='maximum number of epochs without improvement (default: 1)')
+        '-es', '--early_stop', type=int, default=2,
+        help='maximum number of epochs without improvement (default: 2)')
     arg_parser.add_argument(
         '-bs', '--batch_size', type=int, default=32,
         help='maximum number of sentences per batch (default: 32)')
@@ -79,8 +79,8 @@ def parse_arguments():
         '-dr', '--decay_rate', type=float, default=.5,
         help='learning rate decay (default: 0.5)')
     arg_parser.add_argument(
-        '-rs', '--random_seed', type=int,
-        help='seed for probabilistic components (default: None)')
+        '-rs', '--random_seed', type=int, default=42,
+        help='seed for probabilistic components (default: 42)')
 
     return arg_parser.parse_args()
 

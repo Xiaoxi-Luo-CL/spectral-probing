@@ -89,7 +89,7 @@ def parse_arguments():
     p.add_argument('--settings', default='all',
                    help='comma-separated W<w>_G<g> / plain settings (see zero_shot.py), or one of '
                         '"all", "zero_shot" (seed-independent) or "train"')
-    p.add_argument('--n_examples', default='50,100,500,1000',
+    p.add_argument('--n_examples', default='100,500,1000',
                    help='Comma-separated n_examples for training conditions')
     p.add_argument('--largest_n_only', action='store_true', default=False,
                    help='per target, run only the largest n_examples that fits its train pool')
@@ -98,12 +98,12 @@ def parse_arguments():
                         'filter, used by the plain setting, which is skipped when no entry exists')
     p.add_argument('--pool_word_embed', default='avg', choices=['avg', 'last', 'None', 'none'],
                    help='Word-level pooling (default: avg)')
-    p.add_argument('--output_dir', default='direction1/transfer/results_coverage')
+    p.add_argument('--output_dir', default='direction1/transfer/results_coverage_v3')
     # training hyperparameters
-    p.add_argument('--epochs', type=int, default=10)
-    p.add_argument('--early_stop', type=int, default=1)
-    p.add_argument('--min_delta', type=float, default=0.0,
-                   help='relative dev-loss drop an epoch needs to count as an improvement (default 0)')
+    p.add_argument('--epochs', type=int, default=100)
+    p.add_argument('--early_stop', type=int, default=2)
+    p.add_argument('--min_delta', type=float, default=1e-3,
+                   help='relative dev-loss drop an epoch needs to count as an improvement (0: any drop counts)')
     p.add_argument('--batch_size', type=int, default=32)
     p.add_argument('--embed_batch_size', type=int, default=None,
                    help='sentences per LM forward pass when filling the embedding cache (default: '

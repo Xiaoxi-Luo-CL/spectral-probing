@@ -20,17 +20,16 @@
 #   $3  src_pool       pool used in source experiment (avg for encoders, last for decoders)
 #   $4  task           relations | pos  (default: relations)
 #   $5  settings       comma-separated W<w>_G<g> / plain settings, or all (default: all)
-#   $6  n_examples     comma-separated list (default: 50,100,500,1000)
+#   $6  n_examples     comma-separated list (default: 100,500,1000)
 #   $7  target_list    path to coverage_targets.json (default: direction1/transfer/coverage_targets.json)
-#   $8  output_dir     output directory (default: direction1/transfer/results_coverage_v2, the rerun
-#                      with sigmoid-gated frozen filters and label-weighted accuracy)
+#   $8  output_dir     output directory (default: direction1/transfer/results_coverage_v3)
 #   $9  seed           random seed (default: 42); results go into seed{N}/ subdirectory
 #   $10 embed_batch    sentences per LM forward pass when filling the embedding cache
 #                      (default: 32). Use 8 for the 7-8B decoders on 48GB GPUs; probe
 #                      training keeps --batch_size 32 either way.
 #   $11...             any further arguments are passed to run_batch.py verbatim and
 #                      override the defaults below (argparse keeps the last value), e.g.
-#                      --epochs 30 --early_stop 2 --largest_n_only --plain_sources <json>
+#                      --largest_n_only --plain_sources <json> --learning_rate 3e-3
 
 set -euo pipefail   # a failed run must fail the job, not end on the trailing echo
 
@@ -41,9 +40,9 @@ src_lang="$2"
 src_pool="${3:-avg}"
 task="${4:-relations}"
 settings="${5:-all}"
-n_examples="${6:-50,100,500,1000}"
+n_examples="${6:-100,500,1000}"
 target_list="${7:-direction1/transfer/coverage_targets.json}"
-output_dir="${8:-direction1/transfer/results_coverage_v2}"
+output_dir="${8:-direction1/transfer/results_coverage_v3}"
 seed="${9:-42}"
 embed_batch="${10:-32}"
 
@@ -75,8 +74,9 @@ $PYTHON -m direction1.transfer.run_batch \
     --pool_word_embed "$src_pool" \
     --output_dir "$output_dir" \
     --random_seed "$seed" \
-    --epochs 10 \
-    --early_stop 1 \
+    --epochs 100 \
+    --early_stop 2 \
+    --min_delta 1e-3 \
     --batch_size 32 \
     --embed_batch_size "$embed_batch" \
     --learning_rate 1e-3 \
